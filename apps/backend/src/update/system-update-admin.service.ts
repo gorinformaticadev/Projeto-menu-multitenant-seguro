@@ -1,4 +1,4 @@
-﻿import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
@@ -81,6 +81,26 @@ export class SystemUpdateAdminService {
 
     const mode = this.detectInstallationMode();
     const runtime = this.resolveRuntimePaths(mode);
+    
+    // Auto-update isolado da pasta install/ antes de prosseguir
+    if (mode === 'native') {
+      try {
+        const { execSync } = require('child_process');
+        this.logger.log(`[Auto-Update] Baixando scripts de instalação otimizados da tag ${version}...`);
+        
+        // Puxa a referência da tag alvo
+        execSync(`git fetch origin tag ${version} --no-tags --depth=1`, { cwd: runtime.baseDir, stdio: 'ignore' });
+        
+        // Sobrescreve localmente SOMENTE a pasta install/ e descarta mudanças da area de staging
+        execSync(`git checkout ${version} -- install/`, { cwd: runtime.baseDir, stdio: 'ignore' });
+        execSync(`git reset HEAD install/`, { cwd: runtime.baseDir, stdio: 'ignore' });
+        
+        this.logger.log(`[Auto-Update] Instalador pré-atualizado para a tag ${version}. Trazendo as últimas modificações no script!`);
+      } catch (err) {
+        this.logger.warn(`[Auto-Update] Falhou ao atualizar o script de deploy preventivamente (esperado em simuladores ou auth falha): ${err.message}`);
+      }
+    }
+
     this.ensureScriptExists(runtime.updateScriptPath, mode === 'docker' ? 'update-images.sh' : 'update-native.sh');
     await this.assertNoRunningOperation(runtime, true);
     const fromVersion = await this.resolveCurrentVersion(runtime.baseDir);
