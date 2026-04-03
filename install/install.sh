@@ -146,6 +146,7 @@ acquire_global_update_lock() {
         echo "Ja existe uma atualizacao em execucao"
         exit 1
     fi
+    printf '%s\n' "$$" 1>&200
 }
 
 # --- Uso ---

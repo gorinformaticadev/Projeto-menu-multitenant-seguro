@@ -35,6 +35,7 @@ type TerminalUpdateLogPayload = {
 
 const COMMAND = 'sudo -n /usr/local/bin/pluggor-update';
 const WRAPPER_PATH = '/usr/local/bin/pluggor-update';
+const LOCK_FILE_PATH = '/tmp/pluggor-update.lock';
 const MAX_LOG_FILES = 10;
 
 @Injectable()
@@ -242,23 +243,49 @@ export class TerminalUpdateRunnerService {
   }
 
   private reconcileState(state: TerminalUpdateState): TerminalUpdateState {
-    if (state.status !== 'running') {
-      return state;
+    const lockPid = this.readActiveLockPid();
+
+    if (state.status === 'running') {
+      if (this.isPidAlive(state.pid)) {
+        return state;
+      }
+
+      if (lockPid) {
+        const reconciledRunning: TerminalUpdateState = {
+          ...state,
+          status: 'running',
+          pid: lockPid,
+          lastError: null,
+        };
+        this.writeState(reconciledRunning);
+        return reconciledRunning;
+      }
+
+      const reconciledLost: TerminalUpdateState = {
+        ...state,
+        status: 'lost',
+        finishedAt: state.finishedAt ?? new Date().toISOString(),
+        lastError:
+          state.lastError ?? 'O processo de update nao esta mais em execucao e o backend perdeu o estado final.',
+      };
+      this.writeState(reconciledLost);
+      return reconciledLost;
     }
 
-    if (this.isPidAlive(state.pid)) {
-      return state;
+    if (lockPid) {
+      const reconciledFromLock: TerminalUpdateState = {
+        ...state,
+        status: 'running',
+        pid: lockPid,
+        finishedAt: null,
+        exitCode: null,
+        lastError: null,
+      };
+      this.writeState(reconciledFromLock);
+      return reconciledFromLock;
     }
 
-    const reconciled: TerminalUpdateState = {
-      ...state,
-      status: 'lost',
-      finishedAt: state.finishedAt ?? new Date().toISOString(),
-      lastError:
-        state.lastError ?? 'O processo de update nao esta mais em execucao e o backend perdeu o estado final.',
-    };
-    this.writeState(reconciled);
-    return reconciled;
+    return state;
   }
 
   private getStatePath(): string {
@@ -349,6 +376,29 @@ export class TerminalUpdateRunnerService {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  private readActiveLockPid(): number | null {
+    if (!fs.existsSync(LOCK_FILE_PATH)) {
+      return null;
+    }
+
+    try {
+      const raw = fs.readFileSync(LOCK_FILE_PATH, 'utf8').trim();
+      if (!raw) {
+        return null;
+      }
+
+      const pid = Number.parseInt(raw, 10);
+      if (!Number.isInteger(pid) || pid <= 0) {
+        return null;
+      }
+
+      return this.isPidAlive(pid) ? pid : null;
+    } catch (error) {
+      this.logger.warn(`Falha ao ler lockfile do update: ${String(error)}`);
+      return null;
     }
   }
 }

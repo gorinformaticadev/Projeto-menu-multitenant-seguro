@@ -14,10 +14,12 @@ describe('TerminalUpdateRunnerService', () => {
   let tempDir: string;
   let service: TerminalUpdateRunnerService;
   let originalExistsSync: typeof fs.existsSync;
+  let originalReadFileSync: typeof fs.readFileSync;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'terminal-update-runner-'));
     originalExistsSync = fs.existsSync.bind(fs);
+    originalReadFileSync = fs.readFileSync.bind(fs);
     service = new TerminalUpdateRunnerService(
       {
         getProjectRoot: () => tempDir,
@@ -132,5 +134,55 @@ describe('TerminalUpdateRunnerService', () => {
 
     expect(state.status).toBe('lost');
     expect(state.lastError).toMatch(/perdeu o estado final|nao esta mais em execucao/i);
+  });
+
+  it('mantem running quando o pid persistido caiu, mas o lock oficial ainda aponta para um processo vivo', () => {
+    const runtimeDir = path.join(tempDir, 'terminal-update');
+    fs.mkdirSync(runtimeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(runtimeDir, 'terminal-update-state.json'),
+      JSON.stringify({
+        status: 'running',
+        pid: 11111,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        exitCode: null,
+        command: 'sudo -n /usr/local/bin/pluggor-update',
+        logPath: null,
+        lastError: null,
+        triggeredBy: 'panel',
+      }),
+      'utf8',
+    );
+
+    jest.spyOn(fs, 'existsSync').mockImplementation((targetPath: fs.PathLike) => {
+      if (String(targetPath) === '/usr/local/bin/pluggor-update') {
+        return true;
+      }
+      if (String(targetPath) === '/tmp/pluggor-update.lock') {
+        return true;
+      }
+      return originalExistsSync(targetPath);
+    });
+
+    jest.spyOn(fs, 'readFileSync').mockImplementation(((targetPath: fs.PathOrFileDescriptor, options?: any) => {
+      if (String(targetPath) === '/tmp/pluggor-update.lock') {
+        return '22222';
+      }
+      return originalReadFileSync(targetPath as any, options);
+    }) as typeof fs.readFileSync);
+
+    jest.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: number | NodeJS.Signals) => {
+      void signal;
+      if (pid === 22222) {
+        return true;
+      }
+      throw new Error('ESRCH');
+    }) as typeof process.kill);
+
+    const state = service.getStatus();
+
+    expect(state.status).toBe('running');
+    expect(state.pid).toBe(22222);
   });
 });
