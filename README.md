@@ -15,7 +15,7 @@ Os merges devem passar obrigatoriamente pelos seguintes jobs de CI:
 - scripts-check
 - smoke-tests
 
-------------------------------------------------------------------------
+------------------------------------------------------------------------ 
 ## Visão Geral
 
 Este repositório entrega uma stack completa para aplicações SaaS multitenant:
