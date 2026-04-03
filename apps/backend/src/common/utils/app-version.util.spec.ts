@@ -151,7 +151,7 @@ describe('resolveSystemVersion', () => {
       env: { APP_BASE_DIR: workspace.root } as NodeJS.ProcessEnv,
     });
 
-    expect(result.installedVersionRaw).toBe('dev+815c70c');
+    expect(result.installedVersionRaw).toBe('vdev+815c70c');
     expect(result.versionSource).toBe('file');
 
     fs.rmSync(workspace.root, { recursive: true, force: true });

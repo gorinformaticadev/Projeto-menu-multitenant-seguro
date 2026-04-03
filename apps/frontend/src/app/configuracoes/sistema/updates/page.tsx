@@ -396,11 +396,11 @@ export default function UpdatesPage() {
                 {status && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Versao Atual</Label>
+                      <Label className="text-sm font-medium">Versão Atual</Label>
                       <div className="text-2xl font-bold text-skin-info">{versionLoading ? 'carregando...' : displayedVersion}</div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Versao Disponivel</Label>
+                      <Label className="text-sm font-medium">Versão Disponivel</Label>
                       <div className="text-2xl font-bold">
                         {status.availableVersion ? <span className="text-skin-success">{status.availableVersion}</span> : <span className="text-skin-text-muted">N/A</span>}
                       </div>

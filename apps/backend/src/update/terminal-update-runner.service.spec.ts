@@ -219,4 +219,42 @@ describe('TerminalUpdateRunnerService', () => {
     expect(state.exitCode).toBe(0);
     expect(state.lastError).toBeNull();
   });
-});
+
+  it('infere success quando o log chega ao restart das apps sem erro explicito', () => {
+    const runtimeDir = path.join(tempDir, 'terminal-update');
+    const logPath = path.join(runtimeDir, 'terminal-update-2.log');
+    fs.mkdirSync(runtimeDir, { recursive: true });
+    fs.writeFileSync(
+      logPath,
+      '\u001b[1;34m[INFO]\u001b[0m Etapa 20/23: reiniciando apps...\n[PM2] Applying action restartProcessId on app [gorpluggor-backend](ids: [ 0 ])\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(runtimeDir, 'terminal-update-state.json'),
+      JSON.stringify({
+        status: 'running',
+        pid: 246574,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        exitCode: null,
+        command: 'sudo -n /usr/local/bin/pluggor-update',
+        logPath,
+        lastError: null,
+        triggeredBy: 'panel',
+      }),
+      'utf8',
+    );
+
+    jest.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: number | NodeJS.Signals) => {
+      void pid;
+      void signal;
+      throw new Error('ESRCH');
+    }) as typeof process.kill);
+
+    const state = service.getStatus();
+
+    expect(state.status).toBe('success');
+    expect(state.exitCode).toBe(0);
+    expect(state.lastError).toBeNull();
+  });});
+

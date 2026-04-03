@@ -415,21 +415,25 @@ export class TerminalUpdateRunnerService {
 
     try {
       const content = fs.readFileSync(state.logPath, 'utf8');
+      const normalizedContent = this.stripAnsi(content);
       const successDetected =
-        /Instancia native atualizada:/i.test(content) ||
-        /Atualiza(?:ç|c)[aã]o conclu[ií]da/i.test(content) ||
-        /Atualiza..o conclu..da/i.test(content);
+        /Instancia native atualizada:/i.test(normalizedContent) ||
+        /Atualiza(?:Ã§|ç|c)[aÃ£ã]o conclu[iÃ­í]da/i.test(normalizedContent) ||
+        /Atualiza..o conclu..da/i.test(normalizedContent);
       const failureDetected =
-        /Instalador interrompido/i.test(content) ||
-        /\[UPDATE\]\s*runner_error=/i.test(content) ||
-        /\[ERROR\]/i.test(content);
+        /Instalador interrompido/i.test(normalizedContent) ||
+        /\[UPDATE\]\s*runner_error=/i.test(normalizedContent) ||
+        /\[ERROR\]/i.test(normalizedContent);
+      const restartStageDetected =
+        /Etapa\s+20\/23:\s+reiniciando apps/i.test(normalizedContent) ||
+        /Applying action restartProcessId on app \[.+-backend\]/i.test(normalizedContent);
 
-      if (!successDetected && !failureDetected) {
+      if (!successDetected && !failureDetected && !restartStageDetected) {
         return null;
       }
 
       const finishedAt = this.resolveLogFinishedAt(state.logPath);
-      if (successDetected && !failureDetected) {
+      if ((successDetected || restartStageDetected) && !failureDetected) {
         return {
           ...state,
           status: 'success',
@@ -458,5 +462,9 @@ export class TerminalUpdateRunnerService {
     } catch {
       return new Date().toISOString();
     }
+  }
+
+  private stripAnsi(content: string): string {
+    return content.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '');
   }
 }
