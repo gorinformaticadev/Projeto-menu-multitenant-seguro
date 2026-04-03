@@ -29,7 +29,10 @@ describe('TerminalUpdateRunnerService', () => {
     );
 
     jest.spyOn(fs, 'existsSync').mockImplementation((targetPath: fs.PathLike) => {
-      if (String(targetPath) === '/usr/local/bin/pluggor-app-update') {
+      if (
+        String(targetPath) === '/usr/local/bin/pluggor-app-update' ||
+        String(targetPath) === '/usr/local/bin/pluggor-update'
+      ) {
         return true;
       }
       return originalExistsSync(targetPath);
@@ -66,7 +69,10 @@ describe('TerminalUpdateRunnerService', () => {
 
   it('le o status persistido em /var/lib/pluggor/update/current/status.json', () => {
     jest.spyOn(fs, 'existsSync').mockImplementation((targetPath: fs.PathLike) => {
-      if (String(targetPath) === '/usr/local/bin/pluggor-app-update') {
+      if (
+        String(targetPath) === '/usr/local/bin/pluggor-app-update' ||
+        String(targetPath) === '/usr/local/bin/pluggor-update'
+      ) {
         return true;
       }
       if (String(targetPath) === '/var/lib/pluggor/update/current/status.json') {
@@ -104,7 +110,10 @@ describe('TerminalUpdateRunnerService', () => {
 
   it('retorna o tail do log apontado pelo status persistido', () => {
     jest.spyOn(fs, 'existsSync').mockImplementation((targetPath: fs.PathLike) => {
-      if (String(targetPath) === '/usr/local/bin/pluggor-app-update') {
+      if (
+        String(targetPath) === '/usr/local/bin/pluggor-app-update' ||
+        String(targetPath) === '/usr/local/bin/pluggor-update'
+      ) {
         return true;
       }
       if (
@@ -136,5 +145,34 @@ describe('TerminalUpdateRunnerService', () => {
 
     expect(tail.logPath).toBe('/var/lib/pluggor/update/history/exec-1.log');
     expect(tail.content).toBe('linha 3\nlinha 4');
+  });
+
+  it('usa o wrapper legado como fallback quando o wrapper novo ainda nao existe', async () => {
+    const child = new EventEmitter() as any;
+    child.pid = 9876;
+    child.on = child.addListener.bind(child);
+    child.unref = jest.fn();
+    spawn.mockReturnValue(child);
+
+    jest.spyOn(fs, 'existsSync').mockImplementation((targetPath: fs.PathLike) => {
+      if (String(targetPath) === '/usr/local/bin/pluggor-app-update') {
+        return false;
+      }
+      if (String(targetPath) === '/usr/local/bin/pluggor-update') {
+        return true;
+      }
+      return false;
+    });
+
+    const state = await service.start({ userId: 'super-2' });
+
+    expect(spawn).toHaveBeenCalledWith(
+      'sudo',
+      ['-n', '/usr/local/bin/pluggor-update'],
+      expect.objectContaining({
+        cwd: '/workspace/pluggor',
+      }),
+    );
+    expect(state.command).toBe('sudo -n /usr/local/bin/pluggor-update');
   });
 });

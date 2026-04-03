@@ -47,8 +47,10 @@ type PersistedUpdateStatusFile = {
   command?: string | null;
 };
 
-const COMMAND = 'sudo -n /usr/local/bin/pluggor-app-update';
-const WRAPPER_PATH = '/usr/local/bin/pluggor-app-update';
+const PRIMARY_COMMAND = 'sudo -n /usr/local/bin/pluggor-app-update';
+const PRIMARY_WRAPPER_PATH = '/usr/local/bin/pluggor-app-update';
+const FALLBACK_COMMAND = 'sudo -n /usr/local/bin/pluggor-update';
+const FALLBACK_WRAPPER_PATH = '/usr/local/bin/pluggor-update';
 const STATUS_PATH = '/var/lib/pluggor/update/current/status.json';
 
 @Injectable()
@@ -68,12 +70,13 @@ export class TerminalUpdateRunnerService {
       throw new ConflictException('Ja existe uma atualizacao em execucao.');
     }
 
-    if (!fs.existsSync(WRAPPER_PATH)) {
+    const wrapper = this.resolveWrapper();
+    if (!wrapper) {
       throw new ServiceUnavailableException('Wrapper de update da plataforma nao encontrado.');
     }
 
     const startedAt = new Date().toISOString();
-    const child = spawn('sudo', ['-n', WRAPPER_PATH], {
+    const child = spawn('sudo', ['-n', wrapper.path], {
       cwd: this.pathsService.getProjectRoot(),
       stdio: 'ignore',
       env: {
@@ -99,7 +102,7 @@ export class TerminalUpdateRunnerService {
       },
       tenantId: null,
       metadata: {
-        command: COMMAND,
+        command: wrapper.command,
         source: 'panel',
       },
     });
@@ -110,7 +113,7 @@ export class TerminalUpdateRunnerService {
       title: 'Update iniciado',
       body: 'O painel iniciou o fluxo oficial de update da plataforma.',
       data: {
-        command: COMMAND,
+        command: wrapper.command,
         pid: child.pid ?? null,
       },
       module: 'update',
@@ -138,7 +141,7 @@ export class TerminalUpdateRunnerService {
       startedAt,
       finishedAt: null,
       exitCode: null,
-      command: COMMAND,
+      command: wrapper.command,
       logPath: null,
       lastError: null,
       triggeredBy: 'panel',
@@ -158,7 +161,7 @@ export class TerminalUpdateRunnerService {
         startedAt: null,
         finishedAt: null,
         exitCode: null,
-        command: COMMAND,
+        command: this.resolveWrapperCommand(),
         logPath: null,
         lastError: null,
         triggeredBy: 'panel',
@@ -200,7 +203,7 @@ export class TerminalUpdateRunnerService {
         startedAt: parsed.startedAt ?? null,
         finishedAt: parsed.finishedAt ?? null,
         exitCode: typeof parsed.exitCode === 'number' ? parsed.exitCode : null,
-        command: parsed.command || COMMAND,
+        command: parsed.command || this.resolveWrapperCommand(),
         logPath: parsed.logPath ?? null,
         lastError: parsed.errorMessage ?? null,
         triggeredBy: 'panel',
@@ -235,10 +238,33 @@ export class TerminalUpdateRunnerService {
       startedAt: null,
       finishedAt: null,
       exitCode: null,
-      command: COMMAND,
+      command: this.resolveWrapperCommand(),
       logPath: null,
       lastError: null,
       triggeredBy: null,
     };
+  }
+
+  private resolveWrapper(): { path: string; command: string } | null {
+    if (fs.existsSync(PRIMARY_WRAPPER_PATH)) {
+      return {
+        path: PRIMARY_WRAPPER_PATH,
+        command: PRIMARY_COMMAND,
+      };
+    }
+
+    if (fs.existsSync(FALLBACK_WRAPPER_PATH)) {
+      this.logger.warn('Wrapper legado pluggor-update em uso. Instale pluggor-app-update para concluir a migracao.');
+      return {
+        path: FALLBACK_WRAPPER_PATH,
+        command: FALLBACK_COMMAND,
+      };
+    }
+
+    return null;
+  }
+
+  private resolveWrapperCommand(): string {
+    return this.resolveWrapper()?.command || PRIMARY_COMMAND;
   }
 }
