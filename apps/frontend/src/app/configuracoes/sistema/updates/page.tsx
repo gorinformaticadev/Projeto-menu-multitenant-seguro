@@ -92,7 +92,7 @@ function getApiErrorMessage(error: unknown, fallback = 'Erro interno do servidor
 export default function UpdatesPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { version, loading: versionLoading } = useSystemVersion();
+  const { version, loading: versionLoading, refreshVersion } = useSystemVersion();
   const { state: maintenanceState, isMaintenanceActive } = useMaintenance();
   const maintenanceReason = maintenanceState.reason || 'Atualizacao em andamento';
 
@@ -123,6 +123,7 @@ export default function UpdatesPage() {
 
   const effectiveMode = status?.effectiveMode || status?.mode || 'native';
   const isUpdateRunning = runtimeStatus?.status === 'running' || loading.update;
+  const displayedVersion = version !== 'unknown' ? version : status?.currentVersion || 'unknown';
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || '').trim().toLowerCase();
@@ -235,10 +236,11 @@ export default function UpdatesPage() {
       void loadLogs({ silent: true });
       void loadRuntimeStatus({ silent: true });
       void loadRuntimeLog({ silent: true });
+      void refreshVersion();
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, [isMaintenanceActive, isUpdateRunning, loadLogs, loadRuntimeLog, loadRuntimeStatus, loadStatus]);
+  }, [isMaintenanceActive, isUpdateRunning, loadLogs, loadRuntimeLog, loadRuntimeStatus, loadStatus, refreshVersion]);
 
   useEffect(() => {
     const currentStatus = runtimeStatus?.status || 'idle';
@@ -258,6 +260,10 @@ export default function UpdatesPage() {
               : runtimeStatus?.lastError || 'O processo de atualizacao terminou com falha.',
           variant: currentStatus === 'success' ? 'default' : 'destructive',
         });
+        void loadStatus({ silent: true });
+        void loadLogs({ silent: true });
+        void loadRuntimeLog({ silent: true });
+        void refreshVersion();
       }
       return;
     }
@@ -265,7 +271,7 @@ export default function UpdatesPage() {
     if (isUpdateRunning) {
       lastRuntimeStatusRef.current = null;
     }
-  }, [isUpdateRunning, runtimeStatus, toast]);
+  }, [isUpdateRunning, loadLogs, loadRuntimeLog, loadStatus, refreshVersion, runtimeStatus, toast]);
 
   const checkForUpdates = async () => {
     try {
@@ -391,7 +397,7 @@ export default function UpdatesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versao Atual</Label>
-                      <div className="text-2xl font-bold text-skin-info">{versionLoading ? 'carregando...' : version}</div>
+                      <div className="text-2xl font-bold text-skin-info">{versionLoading ? 'carregando...' : displayedVersion}</div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versao Disponivel</Label>
