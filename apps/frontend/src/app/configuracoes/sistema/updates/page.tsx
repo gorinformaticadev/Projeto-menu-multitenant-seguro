@@ -102,7 +102,7 @@ export default function UpdatesPage() {
   const { toast } = useToast();
   const { version, loading: versionLoading, refreshVersion } = useSystemVersion();
   const { state: maintenanceState, isMaintenanceActive } = useMaintenance();
-  const maintenanceReason = maintenanceState.reason || 'Atualizacao em andamento';
+  const maintenanceReason = maintenanceState.reason || 'Atualização em andamento';
 
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [logs, setLogs] = useState<UpdateLog[]>([]);
@@ -280,14 +280,14 @@ export default function UpdatesPage() {
         toast({
           title:
             currentStatus === 'success'
-              ? 'Atualizacao concluida'
+              ? 'Atualização concluida'
               : currentStatus === 'lost'
                 ? 'Execucao perdida'
-                : 'Atualizacao falhou',
+                : 'Atualização falhou',
           description:
             currentStatus === 'success'
               ? 'O fluxo oficial de update terminou com sucesso.'
-              : runtimeStatus?.lastError || 'O processo de atualizacao terminou com falha.',
+              : runtimeStatus?.lastError || 'O processo de atualização terminou com falha.',
           variant: currentStatus === 'success' ? 'default' : 'destructive',
         });
         void loadStatus({ silent: true });
@@ -330,16 +330,16 @@ export default function UpdatesPage() {
       setLoading(prev => ({ ...prev, update: true }));
       const response = await api.post('/api/system/update/run', {});
       toast({
-        title: 'Atualizacao iniciada',
-        description: response.data?.message || 'O processo de atualizacao foi iniciado.',
+        title: 'Atualização iniciada',
+        description: response.data?.message || 'O processo de atualização foi iniciado.',
       });
       setShowUpdateConfirm(false);
       setShowRuntimeModal(true);
       await Promise.all([loadStatus(), loadLogs(), loadRuntimeStatus(), loadRuntimeLog()]);
     } catch (error: unknown) {
       toast({
-        title: 'Erro na atualizacao',
-        description: getApiErrorMessage(error, 'Falha ao iniciar atualizacao'),
+        title: 'Erro na atualização',
+        description: getApiErrorMessage(error, 'Falha ao iniciar atualização'),
         variant: 'destructive',
       });
     } finally {
@@ -405,15 +405,15 @@ export default function UpdatesPage() {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Gerenciamento do Sistema</h1>
-        <p className="text-skin-text-muted">Controle de versoes, atualizacoes e manutencao da plataforma.</p>
+        <p className="text-skin-text-muted">Controle de versoes, atualizacões e manutenção da plataforma.</p>
       </div>
 
       <div className="flex flex-col gap-6">
         <div className="flex gap-2 border-b pb-4">
-          <Button variant={activeTab === 'status' ? 'default' : 'outline'} onClick={() => setActiveTab('status')}>Status & Atualizacoes</Button>
-          <Button variant={activeTab === 'config' ? 'default' : 'outline'} onClick={() => setActiveTab('config')}>Configuracoes</Button>
+          <Button variant={activeTab === 'status' ? 'default' : 'outline'} onClick={() => setActiveTab('status')}>Status & Atualizações</Button>
+          <Button variant={activeTab === 'config' ? 'default' : 'outline'} onClick={() => setActiveTab('config')}>Configurações</Button>
           <Button variant={activeTab === 'backup' ? 'default' : 'outline'} onClick={() => setActiveTab('backup')}><Database className="w-4 h-4 mr-2" />Backup & Restore</Button>
-          <Button variant={activeTab === 'history' ? 'default' : 'outline'} onClick={() => setActiveTab('history')}>Historico</Button>
+          <Button variant={activeTab === 'history' ? 'default' : 'outline'} onClick={() => setActiveTab('history')}>Histórico</Button>
         </div>
 
         {activeTab === 'status' && (
@@ -440,14 +440,14 @@ export default function UpdatesPage() {
                       <Label className="text-sm font-medium">Status</Label>
                       <div>
                         {status.updateAvailable ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-success/100 text-white"><Download className="w-3 h-3 mr-1" />Atualizacao disponivel</span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-success/100 text-white"><Download className="w-3 h-3 mr-1" />Atualização disponivel</span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-background-elevated text-skin-text"><CheckCircle className="w-3 h-3 mr-1" />Atualizado</span>
                         )}
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Modo de Instalacao</Label>
+                      <Label className="text-sm font-medium">Modo de Instalação</Label>
                       <div className="flex items-center gap-2">
                         {effectiveMode === 'docker' ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-info/15 text-skin-info"><Settings className="w-3 h-3 mr-1" />Container Docker</span>
@@ -457,7 +457,7 @@ export default function UpdatesPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Canal de Atualizacao</Label>
+                      <Label className="text-sm font-medium">Canal de Atualização</Label>
                       <div className="text-sm font-mono text-skin-text-muted">{status.updateChannel === 'stable' ? 'Stable' : status.updateChannel === 'rc' ? 'RC' : status.updateChannel === 'dev' ? 'Dev' : status.updateChannel}</div>
                     </div>
                   </div>
@@ -470,7 +470,7 @@ export default function UpdatesPage() {
                   </Button>
                   <Button onClick={() => setShowUpdateConfirm(true)} disabled={isUpdateRunning} className="bg-skin-success hover:bg-skin-success/90 text-white">
                     <Download className="w-4 h-4 mr-2" />
-                    Executar Atualizacao
+                    Executar Atualização
                   </Button>
                 </div>
               </CardContent>
@@ -541,7 +541,7 @@ export default function UpdatesPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5" />Configuracoes do Sistema</CardTitle>
-                <CardDescription>Configure o repositorio Git e parametros de atualizacao.</CardDescription>
+                <CardDescription>Configure o repositorio Git e parametros de atualização.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -562,7 +562,7 @@ export default function UpdatesPage() {
                     <Input id="gitReleaseBranch" value={config.gitReleaseBranch} onChange={(e) => setConfig(prev => ({ ...prev, gitReleaseBranch: e.target.value }))} placeholder="ex: main ou master" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="updateChannel">Canal de Atualizacao</Label>
+                    <Label htmlFor="updateChannel">Canal de Atualização</Label>
                     <select id="updateChannel" value={config.updateChannel} onChange={(e) => setConfig(prev => ({ ...prev, updateChannel: e.target.value as 'stable' | 'rc' | 'dev' }))} className="w-full px-3 py-2 border border-skin-border-strong rounded-md">
                       <option value="stable">Stable (Pegara apenas releases criadas)</option>
                       <option value="rc">RC (Pegara apenas tags no formato vX.X.X)</option>
@@ -570,7 +570,7 @@ export default function UpdatesPage() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="packageManager">Modo de Instalacao</Label>
+                    <Label htmlFor="packageManager">Modo de Instalação</Label>
                     <div className="flex items-center gap-2 px-3 py-2 border border-skin-border-strong rounded-md bg-skin-background-subtle">
                       {effectiveMode === 'docker' ? (
                         <span className="flex items-center text-sm font-medium"><Settings className="w-4 h-4 mr-2 text-skin-info" />Container Docker (Auto-detectado)</span>
@@ -603,11 +603,11 @@ export default function UpdatesPage() {
         {activeTab === 'history' && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><History className="w-5 h-5" />Historico de Atualizacoes</CardTitle>
+              <CardTitle className="flex items-center gap-2"><History className="w-5 h-5" />Historico de Atualizações</CardTitle>
             </CardHeader>
             <CardContent>
               {logs.length === 0 ? (
-                <div className="py-8 text-center text-skin-text-muted">Nenhuma atualizacao registrada</div>
+                <div className="py-8 text-center text-skin-text-muted">Nenhuma atualização registrada</div>
               ) : (
                 <div className="space-y-4">
                   {logs.map((log) => (
@@ -630,7 +630,7 @@ export default function UpdatesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Confirmar Atualizacao</CardTitle>
+              <CardTitle>Confirmar Atualização</CardTitle>
               <CardDescription>O painel executara o mesmo fluxo oficial usado no terminal.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -688,7 +688,7 @@ export default function UpdatesPage() {
           )}
 
           <pre className="min-h-[320px] max-h-[60vh] overflow-auto rounded-lg border border-skin-border bg-skin-background-subtle p-4 text-xs text-skin-text whitespace-pre-wrap break-words">
-            {runtimeLog || 'Nenhuma execucao de update registrada.'}
+            {runtimeLog || 'Nenhuma execução de update registrada.'}
           </pre>
 
           <DialogFooter>
