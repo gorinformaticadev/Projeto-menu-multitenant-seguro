@@ -138,4 +138,22 @@ describe('resolveSystemVersion', () => {
 
     fs.rmSync(workspace.root, { recursive: true, force: true });
   });
+
+  it('considera APP_BASE_DIR como raiz candidata para encontrar a metadata de versao', () => {
+    const workspace = createWorkspace('3.4.2');
+    jest.spyOn(childProcess, 'execFileSync').mockImplementation(() => {
+      throw new Error('git indisponivel');
+    });
+    fs.writeFileSync(path.join(workspace.root, 'VERSION'), 'dev+815c70c\n', 'utf8');
+
+    const result = resolveSystemVersion({
+      cwd: path.join(workspace.root, 'apps', 'backend', 'dist'),
+      env: { APP_BASE_DIR: workspace.root } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.installedVersionRaw).toBe('dev+815c70c');
+    expect(result.versionSource).toBe('file');
+
+    fs.rmSync(workspace.root, { recursive: true, force: true });
+  });
 });
