@@ -1,7 +1,6 @@
 import { ConflictException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ChildProcess, spawn } from 'child_process';
 import * as fs from 'fs';
-import * as path from 'path';
 import { AuditService } from '../audit/audit.service';
 import { NotificationService } from '../notifications/notification.service';
 import { PathsService } from '@core/common/paths/paths.service';
@@ -33,10 +32,24 @@ type TerminalUpdateLogPayload = {
   logPath: string | null;
 };
 
-const COMMAND = 'sudo -n /usr/local/bin/pluggor-update';
-const WRAPPER_PATH = '/usr/local/bin/pluggor-update';
-const LOCK_FILE_PATH = '/tmp/pluggor-update.lock';
-const MAX_LOG_FILES = 10;
+type PersistedUpdateStatusFile = {
+  executionId?: string;
+  state?: 'running' | 'success' | 'failed';
+  step?: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  exitCode?: number | null;
+  runtimeVersionBefore?: string | null;
+  runtimeVersionAfter?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  logPath?: string | null;
+  command?: string | null;
+};
+
+const COMMAND = 'sudo -n /usr/local/bin/pluggor-app-update';
+const WRAPPER_PATH = '/usr/local/bin/pluggor-app-update';
+const STATUS_PATH = '/var/lib/pluggor/update/current/status.json';
 
 @Injectable()
 export class TerminalUpdateRunnerService {
@@ -56,20 +69,13 @@ export class TerminalUpdateRunnerService {
     }
 
     if (!fs.existsSync(WRAPPER_PATH)) {
-      throw new ServiceUnavailableException('Wrapper de update native nao encontrado.');
+      throw new ServiceUnavailableException('Wrapper de update da plataforma nao encontrado.');
     }
 
-    const runtimeDir = this.getRuntimeDir();
-    fs.mkdirSync(runtimeDir, { recursive: true });
-
     const startedAt = new Date().toISOString();
-    const logPath = path.join(runtimeDir, `terminal-update-${Date.now()}.log`);
-    const logFd = fs.openSync(logPath, 'a');
-    fs.writeSync(logFd, `[UPDATE] startedAt=${startedAt}\n[UPDATE] command=${COMMAND}\n`);
-
     const child = spawn('sudo', ['-n', WRAPPER_PATH], {
       cwd: this.pathsService.getProjectRoot(),
-      stdio: ['ignore', logFd, logFd],
+      stdio: 'ignore',
       env: {
         ...process.env,
       },
@@ -78,24 +84,10 @@ export class TerminalUpdateRunnerService {
 
     this.activeProcess = child;
 
-    const state: TerminalUpdateState = {
-      status: 'running',
-      pid: child.pid ?? null,
-      startedAt,
-      finishedAt: null,
-      exitCode: null,
-      command: COMMAND,
-      logPath,
-      lastError: null,
-      triggeredBy: 'panel',
-    };
-    this.writeState(state);
-    this.pruneOldLogs(logPath);
-
     await this.auditService.log({
       action: 'UPDATE_STARTED',
       severity: 'warning',
-      message: 'Update iniciado via painel usando o fluxo oficial do terminal.',
+      message: 'Update iniciado via painel usando o wrapper oficial da plataforma.',
       actor: {
         userId: request.userId,
         email: request.userEmail,
@@ -116,7 +108,7 @@ export class TerminalUpdateRunnerService {
       action: 'UPDATE_STARTED',
       severity: 'warning',
       title: 'Update iniciado',
-      body: 'O painel iniciou o fluxo oficial de update do terminal.',
+      body: 'O painel iniciou o fluxo oficial de update da plataforma.',
       data: {
         command: COMMAND,
         pid: child.pid ?? null,
@@ -125,103 +117,59 @@ export class TerminalUpdateRunnerService {
     });
 
     child.on('error', (error) => {
-      try {
-        fs.writeSync(logFd, `[UPDATE] runner_error=${error.message}\n`);
-      } finally {
-        try {
-          fs.closeSync(logFd);
-        } catch {
-          // noop
-        }
-      }
+      this.logger.warn(`Falha ao iniciar wrapper de update: ${error.message}`);
       this.activeProcess = null;
-      this.writeState({
-        ...state,
-        status: 'failed',
-        finishedAt: new Date().toISOString(),
-        exitCode: -1,
-        lastError: error.message,
-      });
     });
 
-    child.on('close', async (code) => {
-      try {
-        fs.writeSync(logFd, `[UPDATE] exitCode=${code ?? -1}\n`);
-      } finally {
-        try {
-          fs.closeSync(logFd);
-        } catch {
-          // noop
-        }
-      }
-
+    child.on('close', () => {
       this.activeProcess = null;
-
-      const nextState: TerminalUpdateState = {
-        ...state,
-        status: code === 0 ? 'success' : 'failed',
-        finishedAt: new Date().toISOString(),
-        exitCode: code ?? -1,
-        lastError: code === 0 ? null : `Processo finalizado com codigo ${code ?? -1}.`,
-      };
-      this.writeState(nextState);
-
-      try {
-        await this.auditService.log({
-          action: code === 0 ? 'UPDATE_COMPLETED' : 'UPDATE_FAILED',
-          severity: code === 0 ? 'info' : 'error',
-          message:
-            code === 0
-              ? 'Update concluido via painel.'
-              : `Update falhou via painel com codigo ${code ?? -1}.`,
-          actor: {
-            userId: request.userId,
-            email: request.userEmail,
-            role: request.userRole,
-          },
-          requestCtx: {
-            ip: request.ipAddress,
-            userAgent: request.userAgent,
-          },
-          tenantId: null,
-          metadata: {
-            command: COMMAND,
-            source: 'panel',
-            exitCode: code ?? -1,
-          },
-        });
-
-        await this.notificationService.emitSystemAlert({
-          action: code === 0 ? 'UPDATE_COMPLETED' : 'UPDATE_FAILED',
-          severity: code === 0 ? 'info' : 'error',
-          title: code === 0 ? 'Update concluido' : 'Update falhou',
-          body:
-            code === 0
-              ? 'O fluxo oficial de update terminou com sucesso.'
-              : `O fluxo oficial de update terminou com erro (codigo ${code ?? -1}).`,
-          data: {
-            command: COMMAND,
-            exitCode: code ?? -1,
-          },
-          module: 'update',
-        });
-      } catch (error) {
-        this.logger.warn(`Falha ao registrar auditoria/notificacao do update: ${String(error)}`);
-      }
     });
 
     child.unref();
 
-    return state;
+    const persisted = this.readPersistedStatus();
+    if (persisted) {
+      return persisted;
+    }
+
+    return {
+      status: 'running',
+      pid: child.pid ?? null,
+      startedAt,
+      finishedAt: null,
+      exitCode: null,
+      command: COMMAND,
+      logPath: null,
+      lastError: null,
+      triggeredBy: 'panel',
+    };
   }
 
   getStatus(): TerminalUpdateState {
-    const state = this.readState();
-    return this.reconcileState(state);
+    const persisted = this.readPersistedStatus();
+    if (persisted) {
+      return persisted;
+    }
+
+    if (this.activeProcess) {
+      return {
+        status: 'running',
+        pid: this.activeProcess.pid ?? null,
+        startedAt: null,
+        finishedAt: null,
+        exitCode: null,
+        command: COMMAND,
+        logPath: null,
+        lastError: null,
+        triggeredBy: 'panel',
+      };
+    }
+
+    return this.defaultState();
   }
 
   getLogTail(maxLines = 200): TerminalUpdateLogPayload {
-    const state = this.readState();
+    const state = this.getStatus();
     if (!state.logPath || !fs.existsSync(state.logPath)) {
       return {
         content: '',
@@ -230,7 +178,7 @@ export class TerminalUpdateRunnerService {
     }
 
     const content = fs.readFileSync(state.logPath, 'utf8');
-    const lines = content.split(/\r?\n/);
+    const lines = content.split(/\r?\n/).filter((line, index, array) => line.length > 0 || index < array.length - 1);
     const tail = lines.slice(Math.max(0, lines.length - Math.max(1, maxLines)));
     return {
       content: tail.join('\n').trim(),
@@ -238,123 +186,45 @@ export class TerminalUpdateRunnerService {
     };
   }
 
-  private getRuntimeDir(): string {
-    return path.join(this.pathsService.getTempDir(), 'terminal-update');
-  }
-
-  private reconcileState(state: TerminalUpdateState): TerminalUpdateState {
-    const lockPid = this.readActiveLockPid();
-
-    if (state.status === 'running') {
-      if (this.isPidAlive(state.pid)) {
-        return state;
-      }
-
-      if (lockPid) {
-        const reconciledRunning: TerminalUpdateState = {
-          ...state,
-          status: 'running',
-          pid: lockPid,
-          lastError: null,
-        };
-        this.writeState(reconciledRunning);
-        return reconciledRunning;
-      }
-
-      const recoveredState = this.recoverFinishedStateFromLog(state);
-      if (recoveredState) {
-        this.writeState(recoveredState);
-        return recoveredState;
-      }
-
-      const reconciledLost: TerminalUpdateState = {
-        ...state,
-        status: 'lost',
-        finishedAt: state.finishedAt ?? new Date().toISOString(),
-        lastError:
-          state.lastError ?? 'O processo de update nao esta mais em execucao e o backend perdeu o estado final.',
-      };
-      this.writeState(reconciledLost);
-      return reconciledLost;
-    }
-
-    if (lockPid) {
-      const reconciledFromLock: TerminalUpdateState = {
-        ...state,
-        status: 'running',
-        pid: lockPid,
-        finishedAt: null,
-        exitCode: null,
-        lastError: null,
-      };
-      this.writeState(reconciledFromLock);
-      return reconciledFromLock;
-    }
-
-    return state;
-  }
-
-  private getStatePath(): string {
-    return path.join(this.getRuntimeDir(), 'terminal-update-state.json');
-  }
-
-  private readState(): TerminalUpdateState {
-    const statePath = this.getStatePath();
-    if (!fs.existsSync(statePath)) {
-      return this.defaultState();
+  private readPersistedStatus(): TerminalUpdateState | null {
+    if (!fs.existsSync(STATUS_PATH)) {
+      return null;
     }
 
     try {
-      const raw = fs.readFileSync(statePath, 'utf8');
-      const parsed = JSON.parse(raw) as Partial<TerminalUpdateState>;
+      const raw = fs.readFileSync(STATUS_PATH, 'utf8');
+      const parsed = JSON.parse(raw) as PersistedUpdateStatusFile;
       return {
-        ...this.defaultState(),
-        ...parsed,
+        status: this.mapPersistedStatus(parsed.state),
+        pid: null,
+        startedAt: parsed.startedAt ?? null,
+        finishedAt: parsed.finishedAt ?? null,
+        exitCode: typeof parsed.exitCode === 'number' ? parsed.exitCode : null,
+        command: parsed.command || COMMAND,
+        logPath: parsed.logPath ?? null,
+        lastError: parsed.errorMessage ?? null,
+        triggeredBy: 'panel',
       };
     } catch (error) {
-      this.logger.warn(`Falha ao ler estado persistido do update: ${String(error)}`);
+      this.logger.warn(`Falha ao ler status persistido do update: ${String(error)}`);
       return {
         ...this.defaultState(),
         status: 'failed',
-        lastError: 'Falha ao ler o estado persistido do update.',
+        lastError: 'Falha ao ler o status persistido do update.',
       };
     }
   }
 
-  private writeState(state: TerminalUpdateState): void {
-    const runtimeDir = this.getRuntimeDir();
-    fs.mkdirSync(runtimeDir, { recursive: true });
-    fs.writeFileSync(this.getStatePath(), JSON.stringify(state, null, 2), 'utf8');
-  }
-
-  private pruneOldLogs(activeLogPath: string): void {
-    const runtimeDir = this.getRuntimeDir();
-    if (!fs.existsSync(runtimeDir)) {
-      return;
-    }
-
-    const logFiles = fs
-      .readdirSync(runtimeDir, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /^terminal-update-\d+\.log$/.test(entry.name))
-      .map((entry) => {
-        const filePath = path.join(runtimeDir, entry.name);
-        return {
-          filePath,
-          mtimeMs: fs.statSync(filePath).mtimeMs,
-        };
-      })
-      .sort((a, b) => b.mtimeMs - a.mtimeMs);
-
-    for (const staleLog of logFiles.slice(MAX_LOG_FILES)) {
-      if (staleLog.filePath === activeLogPath) {
-        continue;
-      }
-
-      try {
-        fs.rmSync(staleLog.filePath, { force: true });
-      } catch (error) {
-        this.logger.warn(`Falha ao remover log antigo de update: ${String(error)}`);
-      }
+  private mapPersistedStatus(status?: PersistedUpdateStatusFile['state']): TerminalUpdateStatus {
+    switch (status) {
+      case 'running':
+        return 'running';
+      case 'success':
+        return 'success';
+      case 'failed':
+        return 'failed';
+      default:
+        return 'idle';
     }
   }
 
@@ -370,101 +240,5 @@ export class TerminalUpdateRunnerService {
       lastError: null,
       triggeredBy: null,
     };
-  }
-
-  private isPidAlive(pid: number | null): boolean {
-    if (!pid || pid <= 0) {
-      return false;
-    }
-
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private readActiveLockPid(): number | null {
-    if (!fs.existsSync(LOCK_FILE_PATH)) {
-      return null;
-    }
-
-    try {
-      const raw = fs.readFileSync(LOCK_FILE_PATH, 'utf8').trim();
-      if (!raw) {
-        return null;
-      }
-
-      const pid = Number.parseInt(raw, 10);
-      if (!Number.isInteger(pid) || pid <= 0) {
-        return null;
-      }
-
-      return this.isPidAlive(pid) ? pid : null;
-    } catch (error) {
-      this.logger.warn(`Falha ao ler lockfile do update: ${String(error)}`);
-      return null;
-    }
-  }
-
-  private recoverFinishedStateFromLog(state: TerminalUpdateState): TerminalUpdateState | null {
-    if (!state.logPath || !fs.existsSync(state.logPath)) {
-      return null;
-    }
-
-    try {
-      const content = fs.readFileSync(state.logPath, 'utf8');
-      const normalizedContent = this.stripAnsi(content);
-      const successDetected =
-        /Instancia native atualizada:/i.test(normalizedContent) ||
-        /Atualiza(?:Ã§|ç|c)[aÃ£ã]o conclu[iÃ­í]da/i.test(normalizedContent) ||
-        /Atualiza..o conclu..da/i.test(normalizedContent);
-      const failureDetected =
-        /Instalador interrompido/i.test(normalizedContent) ||
-        /\[UPDATE\]\s*runner_error=/i.test(normalizedContent) ||
-        /\[ERROR\]/i.test(normalizedContent);
-      const restartStageDetected =
-        /Etapa\s+20\/23:\s+reiniciando apps/i.test(normalizedContent) ||
-        /Applying action restartProcessId on app \[.+-backend\]/i.test(normalizedContent);
-
-      if (!successDetected && !failureDetected && !restartStageDetected) {
-        return null;
-      }
-
-      const finishedAt = this.resolveLogFinishedAt(state.logPath);
-      if ((successDetected || restartStageDetected) && !failureDetected) {
-        return {
-          ...state,
-          status: 'success',
-          finishedAt,
-          exitCode: 0,
-          lastError: null,
-        };
-      }
-
-      return {
-        ...state,
-        status: 'failed',
-        finishedAt,
-        exitCode: state.exitCode ?? 1,
-        lastError: state.lastError ?? 'O fluxo oficial de update terminou com erro.',
-      };
-    } catch (error) {
-      this.logger.warn(`Falha ao recuperar estado final do update pelo log: ${String(error)}`);
-      return null;
-    }
-  }
-
-  private resolveLogFinishedAt(logPath: string): string {
-    try {
-      return fs.statSync(logPath).mtime.toISOString();
-    } catch {
-      return new Date().toISOString();
-    }
-  }
-
-  private stripAnsi(content: string): string {
-    return content.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '');
   }
 }
