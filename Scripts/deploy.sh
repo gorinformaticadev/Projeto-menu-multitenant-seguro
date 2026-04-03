@@ -232,7 +232,7 @@ cmd_full() {
   log "Buildando backend"
   run_pnpm corepack pnpm --filter backend build
   log "Buildando frontend"
-  run_pnpm corepack pnpm --filter frontend build
+  run_pnpm corepack pnpm -C apps/frontend run build:ci
   log "Validando layout standalone do frontend"
   run_pnpm corepack pnpm -C apps/frontend run check:standalone
   log "Empacotando assets publicos do frontend no standalone"
