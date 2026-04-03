@@ -184,3 +184,4 @@ Scripts/tests/start-backend-instance.ps1
 /.corepack
 /tmp
 /apps/frontend/.next-ci
+/Pluggorinstall
