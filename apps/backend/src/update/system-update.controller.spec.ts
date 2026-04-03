@@ -1,4 +1,5 @@
 import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { HttpException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { ROLES_KEY } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -32,11 +33,18 @@ describe('SystemUpdateController platform boundary', () => {
     })),
   };
 
+  const updateServiceMock = {
+    getUpdateStatus: jest.fn().mockResolvedValue({
+      effectiveMode: 'docker',
+    }),
+  };
+
   const createController = () =>
     new SystemUpdateController(
       serviceMock as any,
       capabilitiesServiceMock as any,
       terminalUpdateRunnerServiceMock as any,
+      updateServiceMock as any,
     );
 
   beforeEach(() => {
@@ -81,6 +89,28 @@ describe('SystemUpdateController platform boundary', () => {
         userRole: Role.SUPER_ADMIN,
       }),
     );
+  });
+
+  it('bloqueia execucao via painel quando a instalacao efetiva e native', async () => {
+    const controller = createController();
+    updateServiceMock.getUpdateStatus.mockResolvedValueOnce({
+      effectiveMode: 'native',
+    });
+
+    await expect(
+      controller.run(
+        {} as any,
+        {
+          user: {
+            id: 'super-1',
+            email: 'super@example.com',
+            role: Role.SUPER_ADMIN,
+          },
+        } as any,
+      ),
+    ).rejects.toBeInstanceOf(HttpException);
+
+    expect(terminalUpdateRunnerServiceMock.start).not.toHaveBeenCalled();
   });
 
   it('expõe as capacidades do engine canonico sem depender do controller legado', async () => {

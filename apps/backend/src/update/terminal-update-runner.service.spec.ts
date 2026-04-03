@@ -185,4 +185,38 @@ describe('TerminalUpdateRunnerService', () => {
     expect(state.status).toBe('running');
     expect(state.pid).toBe(22222);
   });
+
+  it('recupera success pelo log quando o backend reinicia durante o update e o lock ja foi liberado', () => {
+    const runtimeDir = path.join(tempDir, 'terminal-update');
+    const logPath = path.join(runtimeDir, 'terminal-update-1.log');
+    fs.mkdirSync(runtimeDir, { recursive: true });
+    fs.writeFileSync(logPath, '[INFO] Instancia native atualizada: gorpluggor\nAtualização concluída.\n', 'utf8');
+    fs.writeFileSync(
+      path.join(runtimeDir, 'terminal-update-state.json'),
+      JSON.stringify({
+        status: 'running',
+        pid: 242841,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        exitCode: null,
+        command: 'sudo -n /usr/local/bin/pluggor-update',
+        logPath,
+        lastError: null,
+        triggeredBy: 'panel',
+      }),
+      'utf8',
+    );
+
+    jest.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: number | NodeJS.Signals) => {
+      void pid;
+      void signal;
+      throw new Error('ESRCH');
+    }) as typeof process.kill);
+
+    const state = service.getStatus();
+
+    expect(state.status).toBe('success');
+    expect(state.exitCode).toBe(0);
+    expect(state.lastError).toBeNull();
+  });
 });

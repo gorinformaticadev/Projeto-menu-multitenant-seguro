@@ -261,6 +261,12 @@ export class TerminalUpdateRunnerService {
         return reconciledRunning;
       }
 
+      const recoveredState = this.recoverFinishedStateFromLog(state);
+      if (recoveredState) {
+        this.writeState(recoveredState);
+        return recoveredState;
+      }
+
       const reconciledLost: TerminalUpdateState = {
         ...state,
         status: 'lost',
@@ -399,6 +405,58 @@ export class TerminalUpdateRunnerService {
     } catch (error) {
       this.logger.warn(`Falha ao ler lockfile do update: ${String(error)}`);
       return null;
+    }
+  }
+
+  private recoverFinishedStateFromLog(state: TerminalUpdateState): TerminalUpdateState | null {
+    if (!state.logPath || !fs.existsSync(state.logPath)) {
+      return null;
+    }
+
+    try {
+      const content = fs.readFileSync(state.logPath, 'utf8');
+      const successDetected =
+        /Instancia native atualizada:/i.test(content) ||
+        /Atualiza(?:ç|c)[aã]o conclu[ií]da/i.test(content) ||
+        /Atualiza..o conclu..da/i.test(content);
+      const failureDetected =
+        /Instalador interrompido/i.test(content) ||
+        /\[UPDATE\]\s*runner_error=/i.test(content) ||
+        /\[ERROR\]/i.test(content);
+
+      if (!successDetected && !failureDetected) {
+        return null;
+      }
+
+      const finishedAt = this.resolveLogFinishedAt(state.logPath);
+      if (successDetected && !failureDetected) {
+        return {
+          ...state,
+          status: 'success',
+          finishedAt,
+          exitCode: 0,
+          lastError: null,
+        };
+      }
+
+      return {
+        ...state,
+        status: 'failed',
+        finishedAt,
+        exitCode: state.exitCode ?? 1,
+        lastError: state.lastError ?? 'O fluxo oficial de update terminou com erro.',
+      };
+    } catch (error) {
+      this.logger.warn(`Falha ao recuperar estado final do update pelo log: ${String(error)}`);
+      return null;
+    }
+  }
+
+  private resolveLogFinishedAt(logPath: string): string {
+    try {
+      return fs.statSync(logPath).mtime.toISOString();
+    } catch {
+      return new Date().toISOString();
     }
   }
 }
