@@ -68,6 +68,33 @@ ensure_panel_update_dependencies() {
     install_package_if_missing "visudo" "sudo"
 }
 
+validate_file_owner_group_mode() {
+    local file_path="$1"
+    local expected_owner="$2"
+    local expected_group="$3"
+    local expected_mode="$4"
+    local stat_output=""
+    local owner=""
+    local group=""
+    local mode=""
+
+    if [[ ! -e "$file_path" ]]; then
+        return 1
+    fi
+
+    stat_output="$(stat -c '%U:%G:%a' "$file_path" 2>/dev/null || true)"
+    if [[ -z "$stat_output" ]]; then
+        return 1
+    fi
+
+    owner="${stat_output%%:*}"
+    stat_output="${stat_output#*:}"
+    group="${stat_output%%:*}"
+    mode="${stat_output##*:}"
+
+    [[ "$owner" == "$expected_owner" ]] && [[ "$group" == "$expected_group" ]] && [[ "$mode" == "$expected_mode" ]]
+}
+
 install_panel_update_wrapper() {
     local project_dir="$1"
     local wrapper_source="$PROJECT_ROOT/install/pluggor-update.wrapper.sh"
@@ -84,13 +111,27 @@ install_panel_update_wrapper() {
         -e "s|__PROJECT_DIR__|$project_dir|g" \
         "$wrapper_source" > "$wrapper_tmp"
     bash -n "$wrapper_tmp"
+
+    if [[ -f "$PANEL_UPDATE_WRAPPER_DEST" ]] \
+        && validate_file_owner_group_mode "$PANEL_UPDATE_WRAPPER_DEST" "root" "root" "755" \
+        && cmp -s "$wrapper_tmp" "$PANEL_UPDATE_WRAPPER_DEST"; then
+        rm -f "$wrapper_tmp"
+        return 0
+    fi
+
     install -o root -g root -m 0755 "$wrapper_tmp" "$PANEL_UPDATE_WRAPPER_DEST"
     rm -f "$wrapper_tmp"
+
+    if ! validate_file_owner_group_mode "$PANEL_UPDATE_WRAPPER_DEST" "root" "root" "755"; then
+        log_error "Wrapper de update instalado com owner/permissao invalidos: $PANEL_UPDATE_WRAPPER_DEST"
+        exit 1
+    fi
 }
 
 configure_panel_update_sudoers() {
     local app_user="$1"
     local tmp_sudoers=""
+    local desired_line=""
 
     if [[ -z "$app_user" ]]; then
         log_error "APP_USER nao resolvido para configurar sudoers do update via painel."
@@ -105,13 +146,46 @@ configure_panel_update_sudoers() {
         exit 1
     fi
 
+    desired_line="$(printf '%s ALL=(root) NOPASSWD: %s\n' "$app_user" "$PANEL_UPDATE_WRAPPER_DEST")"
+    if [[ -f "$PANEL_UPDATE_SUDOERS_FILE" ]] \
+        && [[ "$(cat "$PANEL_UPDATE_SUDOERS_FILE" 2>/dev/null || true)" == "$desired_line" ]] \
+        && visudo -cf "$PANEL_UPDATE_SUDOERS_FILE" >/dev/null 2>&1; then
+        return 0
+    fi
+
     tmp_sudoers="$(mktemp)"
-    printf '%s ALL=(root) NOPASSWD: %s\n' "$app_user" "$PANEL_UPDATE_WRAPPER_DEST" > "$tmp_sudoers"
+    printf '%s' "$desired_line" > "$tmp_sudoers"
     chmod 440 "$tmp_sudoers"
     visudo -cf "$tmp_sudoers" >/dev/null
     install -o root -g root -m 0440 "$tmp_sudoers" "$PANEL_UPDATE_SUDOERS_FILE"
     rm -f "$tmp_sudoers"
     visudo -cf "$PANEL_UPDATE_SUDOERS_FILE" >/dev/null
+}
+
+native_validate_pm2_runtime_user() {
+    local instance_name="$1"
+    local app_name=""
+    local pid=""
+    local owner=""
+
+    for app_name in "${instance_name}-backend" "${instance_name}-frontend"; do
+        pid="$(run_as_native_user "pm2 pid '$app_name' 2>/dev/null | tail -n 1" | tr -d '[:space:]')"
+        if [[ -z "$pid" ]] || [[ "$pid" == "0" ]] || ! [[ "$pid" =~ ^[0-9]+$ ]]; then
+            log_error "Nao foi possivel validar o PID do processo PM2 '$app_name'."
+            exit 1
+        fi
+
+        owner="$(ps -o user= -p "$pid" 2>/dev/null | awk '{print $1}' | tr -d '[:space:]')"
+        if [[ -z "$owner" ]]; then
+            log_error "Nao foi possivel validar o usuario do processo PM2 '$app_name' (pid $pid)."
+            exit 1
+        fi
+
+        if [[ "$owner" != "$NATIVE_SYSTEM_USER" ]]; then
+            log_error "Processo PM2 '$app_name' esta rodando como '$owner'. Esperado: '$NATIVE_SYSTEM_USER'."
+            exit 1
+        fi
+    done
 }
 
 setup_panel_update_runtime() {
@@ -700,6 +774,7 @@ run_install_native() {
     native_start_pm2_apps "$app_dir" "$instance_name"
     native_configure_nginx_proxy "$domain" "$instance_name"
     native_restart_apps "$instance_name"
+    native_validate_pm2_runtime_user "$instance_name"
     native_wait_backend_health
     native_validate_backend_shared_storage "$app_dir"
     if ! native_setup_certbot "$domain" "$email"; then
@@ -1386,6 +1461,7 @@ run_update_native() {
         native_build_apps "$instance_dir"
         native_migrate_and_seed "$instance_dir"
         native_restart_apps "$instance_name"
+        native_validate_pm2_runtime_user "$instance_name"
         native_wait_backend_health
         native_validate_backend_shared_storage "$instance_dir"
         log_info "Instancia native atualizada: $instance_name"
