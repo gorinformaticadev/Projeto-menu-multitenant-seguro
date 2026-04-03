@@ -96,18 +96,16 @@ package_frontend_runtime_assets() {
   local frontend_dir="$RELEASE_ROOT/apps/frontend"
   local build_dir="$frontend_dir/.next"
   local runtime_dir=""
-  local standalone_build_dir=""
 
   resolve_frontend_standalone_layout
   runtime_dir="$frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR"
-  standalone_build_dir="$frontend_dir/$FRONTEND_STANDALONE_BUILD_DIR"
 
   if [[ -d "$frontend_dir/public" ]]; then
     copy_directory_contents "$frontend_dir/public" "$runtime_dir/public"
   fi
 
   if [[ -d "$build_dir/static" ]]; then
-    copy_directory_contents "$build_dir/static" "$standalone_build_dir/static"
+    copy_directory_contents "$build_dir/static" "$runtime_dir/.next/static"
   fi
 }
 
@@ -144,7 +142,7 @@ validate_frontend_artifact_layout() {
   [[ -n "$source_build_id" ]] || fail "BUILD_ID do frontend veio vazio"
   [[ "$source_build_id" == "$standalone_build_id" ]] || fail "BUILD_ID inconsistente entre build e standalone (fonte=$source_build_id standalone=${standalone_build_id:-<vazio>})"
 
-  if [[ -d "$build_dir/static" ]] && [[ ! -d "$standalone_build_dir/static" ]]; then
+  if [[ -d "$build_dir/static" ]] && [[ ! -d "$runtime_dir/.next/static" ]]; then
     fail "Diretorio .next/static nao foi copiado para o standalone"
   fi
 
