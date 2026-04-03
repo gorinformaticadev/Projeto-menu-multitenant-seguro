@@ -1393,13 +1393,50 @@ detect_docker_installation() {
     return 1
 }
 
+native_instance_matches_runtime_env() {
+    local instance_dir="$1"
+    local backend_env="$instance_dir/apps/backend/.env"
+    local project_root=""
+    local app_base_dir=""
+
+    project_root="$(read_env_value "PROJECT_ROOT" "$backend_env" || true)"
+    app_base_dir="$(read_env_value "APP_BASE_DIR" "$backend_env" || true)"
+
+    [[ "$project_root" == "$instance_dir" ]] || [[ "$app_base_dir" == "$instance_dir" ]]
+}
+
+native_pm2_app_exists() {
+    local app_name="$1"
+    local pid=""
+
+    if ! id "${NATIVE_SYSTEM_USER}" &>/dev/null; then
+        return 1
+    fi
+
+    pid="$(run_as_native_user "pm2 pid '$app_name' 2>/dev/null | tail -n 1" | tr -d '[:space:]' || true)"
+    [[ -n "$pid" ]] && [[ "$pid" != "0" ]]
+}
+
 list_native_instances() {
     if [[ ! -d "$NATIVE_BASE_DIR" ]]; then
         return 0
     fi
 
     find "$NATIVE_BASE_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while read -r instance_dir; do
-        if [[ -f "$instance_dir/apps/backend/.env" ]] && [[ -d "$instance_dir/apps/frontend" ]]; then
+        local backend_env="$instance_dir/apps/backend/.env"
+        local instance_name=""
+
+        if [[ ! -f "$backend_env" ]] || [[ ! -d "$instance_dir/apps/frontend" ]]; then
+            continue
+        fi
+
+        if native_instance_matches_runtime_env "$instance_dir"; then
+            echo "$instance_dir"
+            continue
+        fi
+
+        instance_name="$(basename "$instance_dir")"
+        if native_pm2_app_exists "${instance_name}-backend" || native_pm2_app_exists "${instance_name}-frontend"; then
             echo "$instance_dir"
         fi
     done
