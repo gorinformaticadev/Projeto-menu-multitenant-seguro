@@ -58,6 +58,114 @@ resolve_frontend_port() {
   printf '%s\n' "5000"
 }
 
+copy_directory_contents() {
+  local source_dir="$1"
+  local destination_dir="$2"
+
+  mkdir -p "$destination_dir"
+  cp -a "$source_dir"/. "$destination_dir"/
+}
+
+resolve_frontend_standalone_layout() {
+  local frontend_dir="$RELEASE_ROOT/apps/frontend"
+  local resolved_layout=""
+
+  if [[ -f "$frontend_dir/scripts/start-standalone.mjs" ]]; then
+    resolved_layout="$(cd "$frontend_dir" && node scripts/start-standalone.mjs --print-layout)" || fail "Nao foi possivel resolver o layout standalone do frontend"
+    IFS='|' read -r FRONTEND_STANDALONE_LAYOUT FRONTEND_STANDALONE_ENTRY_REL FRONTEND_STANDALONE_RUNTIME_DIR FRONTEND_STANDALONE_BUILD_DIR <<< "$resolved_layout"
+  elif [[ -f "$frontend_dir/.next/standalone/apps/frontend/server.js" ]]; then
+    FRONTEND_STANDALONE_LAYOUT="monorepo-nested"
+    FRONTEND_STANDALONE_ENTRY_REL=".next/standalone/apps/frontend/server.js"
+    FRONTEND_STANDALONE_RUNTIME_DIR=".next/standalone/apps/frontend"
+    FRONTEND_STANDALONE_BUILD_DIR=".next/standalone/apps/frontend/.next"
+  elif [[ -f "$frontend_dir/.next/standalone/server.js" ]]; then
+    FRONTEND_STANDALONE_LAYOUT="root"
+    FRONTEND_STANDALONE_ENTRY_REL=".next/standalone/server.js"
+    FRONTEND_STANDALONE_RUNTIME_DIR=".next/standalone"
+    FRONTEND_STANDALONE_BUILD_DIR=".next/standalone/.next"
+  else
+    fail "Nenhum entrypoint standalone do frontend foi encontrado apos o build"
+  fi
+
+  [[ -n "${FRONTEND_STANDALONE_ENTRY_REL:-}" ]] || fail "Resolver do standalone retornou entrypoint vazio"
+  [[ -n "${FRONTEND_STANDALONE_RUNTIME_DIR:-}" ]] || fail "Resolver do standalone retornou runtime dir vazio"
+  [[ -n "${FRONTEND_STANDALONE_BUILD_DIR:-}" ]] || fail "Resolver do standalone retornou build dir vazio"
+}
+
+package_frontend_runtime_assets() {
+  local frontend_dir="$RELEASE_ROOT/apps/frontend"
+  local build_dir="$frontend_dir/.next"
+  local runtime_dir=""
+  local standalone_build_dir=""
+
+  resolve_frontend_standalone_layout
+  runtime_dir="$frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR"
+  standalone_build_dir="$frontend_dir/$FRONTEND_STANDALONE_BUILD_DIR"
+
+  if [[ -d "$frontend_dir/public" ]]; then
+    copy_directory_contents "$frontend_dir/public" "$runtime_dir/public"
+  fi
+
+  if [[ -d "$build_dir/static" ]]; then
+    copy_directory_contents "$build_dir/static" "$standalone_build_dir/static"
+  fi
+}
+
+count_frontend_manifest_files() {
+  local base_dir="$1"
+  if [[ ! -d "$base_dir" ]]; then
+    printf '0\n'
+    return 0
+  fi
+
+  find "$base_dir" -type f \( -name '*client-reference-manifest*' -o -name '*server-reference-manifest*' \) | wc -l | tr -d ' '
+}
+
+validate_frontend_artifact_layout() {
+  local frontend_dir="$RELEASE_ROOT/apps/frontend"
+  local build_dir="$frontend_dir/.next"
+  local runtime_dir=""
+  local standalone_build_dir=""
+  local source_build_id=""
+  local standalone_build_id=""
+  local source_manifest_count="0"
+  local standalone_manifest_count="0"
+
+  resolve_frontend_standalone_layout
+  runtime_dir="$frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR"
+  standalone_build_dir="$frontend_dir/$FRONTEND_STANDALONE_BUILD_DIR"
+
+  [[ -f "$frontend_dir/$FRONTEND_STANDALONE_ENTRY_REL" ]] || fail "server.js do standalone nao encontrado em $frontend_dir/$FRONTEND_STANDALONE_ENTRY_REL"
+  [[ -f "$build_dir/BUILD_ID" ]] || fail "BUILD_ID do frontend nao encontrado em $build_dir/BUILD_ID"
+  [[ -f "$standalone_build_dir/BUILD_ID" ]] || fail "BUILD_ID do standalone nao encontrado em $standalone_build_dir/BUILD_ID"
+
+  source_build_id="$(tr -d '\r' < "$build_dir/BUILD_ID" || true)"
+  standalone_build_id="$(tr -d '\r' < "$standalone_build_dir/BUILD_ID" || true)"
+  [[ -n "$source_build_id" ]] || fail "BUILD_ID do frontend veio vazio"
+  [[ "$source_build_id" == "$standalone_build_id" ]] || fail "BUILD_ID inconsistente entre build e standalone (fonte=$source_build_id standalone=${standalone_build_id:-<vazio>})"
+
+  if [[ -d "$build_dir/static" ]] && [[ ! -d "$standalone_build_dir/static" ]]; then
+    fail "Diretorio .next/static nao foi copiado para o standalone"
+  fi
+
+  if [[ -d "$frontend_dir/public" ]] && [[ ! -d "$runtime_dir/public" ]]; then
+    fail "Diretorio public nao foi copiado para o standalone"
+  fi
+
+  source_manifest_count="$(count_frontend_manifest_files "$build_dir/server")"
+  standalone_manifest_count="$(count_frontend_manifest_files "$standalone_build_dir/server")"
+  if (( source_manifest_count > 0 && standalone_manifest_count == 0 )); then
+    fail "Standalone nao contem manifests de referencia obrigatorios do frontend"
+  fi
+}
+
+extract_first_static_asset_path() {
+  local html_file="$1"
+
+  [[ -f "$html_file" ]] || return 0
+  grep -oE '/_next/static/[^"'"'"'[:space:]]+' "$html_file" | head -n 1 || true
+}
+
 ensure_release_layout() {
   [[ -d "$RELEASE_ROOT/apps/backend" ]] || fail "apps/backend nao encontrado em $RELEASE_ROOT"
   [[ -d "$RELEASE_ROOT/apps/frontend" ]] || fail "apps/frontend nao encontrado em $RELEASE_ROOT"
@@ -127,6 +235,12 @@ cmd_full() {
   run_pnpm corepack pnpm --filter backend build
   log "Buildando frontend"
   run_pnpm corepack pnpm --filter frontend build
+  log "Validando layout standalone do frontend"
+  run_pnpm corepack pnpm -C apps/frontend run check:standalone
+  log "Empacotando assets publicos do frontend no standalone"
+  package_frontend_runtime_assets
+  log "Validando integridade do artefato standalone do frontend"
+  validate_frontend_artifact_layout
   log "Aplicando migrations"
   run_pnpm corepack pnpm --filter backend prisma:migrate
   log "Executando seed versionado"
@@ -167,9 +281,19 @@ cmd_health_validation() {
   local host="$DEFAULT_VALIDATION_HOST"
   local backend_port="$DEFAULT_VALIDATION_BACKEND_PORT"
   local frontend_port="$DEFAULT_VALIDATION_FRONTEND_PORT"
+  local frontend_probe_dir="$VALIDATION_DIR/frontend-probe"
+  local home_html_file="$frontend_probe_dir/home.html"
+  local static_asset_path=""
 
   wait_for_http "http://${host}:${backend_port}/api/health" "backend de validacao"
   wait_for_http "http://${host}:${frontend_port}" "frontend de validacao"
+  mkdir -p "$frontend_probe_dir"
+  curl --silent --show-error --fail "http://${host}:${frontend_port}" -o "$home_html_file"
+  static_asset_path="$(extract_first_static_asset_path "$home_html_file")"
+  if [[ -z "$static_asset_path" ]]; then
+    fail "Nao foi possivel localizar nenhum asset em /_next/static na release de validacao"
+  fi
+  wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend de validacao"
   log "Healthcheck da validacao temporaria OK"
 }
 
@@ -212,12 +336,22 @@ cmd_health_published() {
   local host="${PUBLISHED_HOST:-127.0.0.1}"
   local backend_port=""
   local frontend_port=""
+  local published_probe_dir="$VALIDATION_DIR/published-probe"
+  local home_html_file="$published_probe_dir/home.html"
+  local static_asset_path=""
 
   backend_port="$(resolve_backend_port)"
   frontend_port="$(resolve_frontend_port)"
 
   wait_for_http "http://${host}:${backend_port}/api/health" "backend publicado"
   wait_for_http "http://${host}:${frontend_port}" "frontend publicado"
+  mkdir -p "$published_probe_dir"
+  curl --silent --show-error --fail "http://${host}:${frontend_port}" -o "$home_html_file"
+  static_asset_path="$(extract_first_static_asset_path "$home_html_file")"
+  if [[ -z "$static_asset_path" ]]; then
+    fail "Nao foi possivel localizar nenhum asset em /_next/static na release publicada"
+  fi
+  wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend publicado"
   log "Healthcheck da release publicada OK"
 }
 
