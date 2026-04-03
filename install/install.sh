@@ -68,59 +68,8 @@ ensure_panel_update_dependencies() {
     install_package_if_missing "visudo" "sudo"
 }
 
-collect_pm2_runtime_users() {
-    if ! command -v ps &>/dev/null; then
-        return 0
-    fi
-
-    ps -eo user=,args= 2>/dev/null | awk '
-        BEGIN { IGNORECASE = 1 }
-        /pm2/ && /god daemon/ { print $1 }
-    ' | sort -u
-}
-
-resolve_panel_update_app_user() {
-    local explicit_user="${APP_USER:-}"
-    local pm2_users=()
-    local pm2_user=""
-
-    while IFS= read -r pm2_user; do
-        [[ -n "$pm2_user" ]] && pm2_users+=("$pm2_user")
-    done < <(collect_pm2_runtime_users)
-
-    if [[ -n "$explicit_user" ]]; then
-        if [[ "$explicit_user" == "root" ]]; then
-            log_error "APP_USER nao pode ser root."
-            exit 1
-        fi
-        if ! id "$explicit_user" &>/dev/null; then
-            log_error "APP_USER nao encontrado: $explicit_user"
-            exit 1
-        fi
-        echo "$explicit_user"
-        return 0
-    fi
-
-    if [[ "${#pm2_users[@]}" -gt 1 ]]; then
-        log_error "Multiplos usuarios de PM2 detectados (${pm2_users[*]}). Defina APP_USER explicitamente."
-        exit 1
-    fi
-
-    if [[ "${#pm2_users[@]}" -eq 1 ]]; then
-        if [[ "${pm2_users[0]}" == "root" ]]; then
-            log_error "O usuario detectado do PM2 nao pode ser root."
-            exit 1
-        fi
-        echo "${pm2_users[0]}"
-        return 0
-    fi
-
-    echo "$NATIVE_SYSTEM_USER"
-}
-
 install_panel_update_wrapper() {
     local project_dir="$1"
-    local app_user="$2"
     local wrapper_source="$PROJECT_ROOT/install/pluggor-update.wrapper.sh"
     local wrapper_tmp=""
 
@@ -133,7 +82,6 @@ install_panel_update_wrapper() {
     wrapper_tmp="$(mktemp)"
     sed \
         -e "s|__PROJECT_DIR__|$project_dir|g" \
-        -e "s|__APP_USER__|$app_user|g" \
         "$wrapper_source" > "$wrapper_tmp"
     bash -n "$wrapper_tmp"
     install -o root -g root -m 0755 "$wrapper_tmp" "$PANEL_UPDATE_WRAPPER_DEST"
@@ -143,6 +91,19 @@ install_panel_update_wrapper() {
 configure_panel_update_sudoers() {
     local app_user="$1"
     local tmp_sudoers=""
+
+    if [[ -z "$app_user" ]]; then
+        log_error "APP_USER nao resolvido para configurar sudoers do update via painel."
+        exit 1
+    fi
+    if [[ "$app_user" == "root" ]]; then
+        log_error "APP_USER nao pode ser root para configurar sudoers do update via painel."
+        exit 1
+    fi
+    if ! id "$app_user" &>/dev/null; then
+        log_error "APP_USER nao encontrado para configurar sudoers do update via painel: $app_user"
+        exit 1
+    fi
 
     tmp_sudoers="$(mktemp)"
     printf '%s ALL=(root) NOPASSWD: %s\n' "$app_user" "$PANEL_UPDATE_WRAPPER_DEST" > "$tmp_sudoers"
@@ -161,9 +122,21 @@ setup_panel_update_runtime() {
         log_error "Diretorio do projeto nao encontrado para configurar update via painel: $project_dir"
         exit 1
     fi
+    if [[ -z "$app_user" ]]; then
+        log_error "APP_USER nao resolvido para configurar update via painel."
+        exit 1
+    fi
+    if [[ "$app_user" == "root" ]]; then
+        log_error "APP_USER nao pode ser root para configurar update via painel."
+        exit 1
+    fi
+    if ! id "$app_user" &>/dev/null; then
+        log_error "APP_USER nao encontrado para configurar update via painel: $app_user"
+        exit 1
+    fi
 
     ensure_panel_update_dependencies
-    install_panel_update_wrapper "$project_dir" "$app_user"
+    install_panel_update_wrapper "$project_dir"
     configure_panel_update_sudoers "$app_user"
 }
 
@@ -732,7 +705,7 @@ run_install_native() {
         log_warn "SSL nao foi emitido/configurado nesta execucao. Instalacao native continuara sem abortar."
     fi
     native_start_firewall
-    setup_panel_update_runtime "$app_dir" "$(resolve_panel_update_app_user)"
+    setup_panel_update_runtime "$app_dir" "${APP_USER:-$NATIVE_SYSTEM_USER}"
     native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$trusted_device_secret" "$redis_pass" "$app_dir"
 }
 
@@ -2046,7 +2019,7 @@ run_update() {
     fi
 
     if [[ "$native_detected" == "true" ]]; then
-        setup_panel_update_runtime "$PROJECT_ROOT" "$(resolve_panel_update_app_user)"
+        setup_panel_update_runtime "$PROJECT_ROOT" "${APP_USER:-$NATIVE_SYSTEM_USER}"
     fi
 
     echogreen "Atualização concluída."

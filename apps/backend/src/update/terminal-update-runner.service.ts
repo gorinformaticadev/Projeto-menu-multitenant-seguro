@@ -35,6 +35,7 @@ type TerminalUpdateLogPayload = {
 
 const COMMAND = 'sudo -n /usr/local/bin/pluggor-update';
 const WRAPPER_PATH = '/usr/local/bin/pluggor-update';
+const MAX_LOG_FILES = 10;
 
 @Injectable()
 export class TerminalUpdateRunnerService {
@@ -49,7 +50,7 @@ export class TerminalUpdateRunnerService {
 
   async start(request: StartTerminalUpdateRequest): Promise<TerminalUpdateState> {
     const current = this.getStatus();
-    if (current.status === 'running' || (current.status === 'lost' && this.isPidAlive(current.pid))) {
+    if (current.status === 'running') {
       throw new ConflictException('Ja existe uma atualizacao em execucao.');
     }
 
@@ -71,6 +72,7 @@ export class TerminalUpdateRunnerService {
       env: {
         ...process.env,
       },
+      detached: true,
     });
 
     this.activeProcess = child;
@@ -87,6 +89,7 @@ export class TerminalUpdateRunnerService {
       triggeredBy: 'panel',
     };
     this.writeState(state);
+    this.pruneOldLogs(logPath);
 
     await this.auditService.log({
       action: 'UPDATE_STARTED',
@@ -206,21 +209,14 @@ export class TerminalUpdateRunnerService {
       }
     });
 
+    child.unref();
+
     return state;
   }
 
   getStatus(): TerminalUpdateState {
     const state = this.readState();
-    if (state.status === 'running' && !this.activeProcess) {
-      const reconciled: TerminalUpdateState = {
-        ...state,
-        status: 'lost',
-        lastError: 'O backend perdeu o vinculo com o processo de update em execucao.',
-      };
-      this.writeState(reconciled);
-      return reconciled;
-    }
-    return state;
+    return this.reconcileState(state);
   }
 
   getLogTail(maxLines = 200): TerminalUpdateLogPayload {
@@ -243,6 +239,26 @@ export class TerminalUpdateRunnerService {
 
   private getRuntimeDir(): string {
     return path.join(this.pathsService.getTempDir(), 'terminal-update');
+  }
+
+  private reconcileState(state: TerminalUpdateState): TerminalUpdateState {
+    if (state.status !== 'running') {
+      return state;
+    }
+
+    if (this.isPidAlive(state.pid)) {
+      return state;
+    }
+
+    const reconciled: TerminalUpdateState = {
+      ...state,
+      status: 'lost',
+      finishedAt: state.finishedAt ?? new Date().toISOString(),
+      lastError:
+        state.lastError ?? 'O processo de update nao esta mais em execucao e o backend perdeu o estado final.',
+    };
+    this.writeState(reconciled);
+    return reconciled;
   }
 
   private getStatePath(): string {
@@ -276,6 +292,37 @@ export class TerminalUpdateRunnerService {
     const runtimeDir = this.getRuntimeDir();
     fs.mkdirSync(runtimeDir, { recursive: true });
     fs.writeFileSync(this.getStatePath(), JSON.stringify(state, null, 2), 'utf8');
+  }
+
+  private pruneOldLogs(activeLogPath: string): void {
+    const runtimeDir = this.getRuntimeDir();
+    if (!fs.existsSync(runtimeDir)) {
+      return;
+    }
+
+    const logFiles = fs
+      .readdirSync(runtimeDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /^terminal-update-\d+\.log$/.test(entry.name))
+      .map((entry) => {
+        const filePath = path.join(runtimeDir, entry.name);
+        return {
+          filePath,
+          mtimeMs: fs.statSync(filePath).mtimeMs,
+        };
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    for (const staleLog of logFiles.slice(MAX_LOG_FILES)) {
+      if (staleLog.filePath === activeLogPath) {
+        continue;
+      }
+
+      try {
+        fs.rmSync(staleLog.filePath, { force: true });
+      } catch (error) {
+        this.logger.warn(`Falha ao remover log antigo de update: ${String(error)}`);
+      }
+    }
   }
 
   private defaultState(): TerminalUpdateState {

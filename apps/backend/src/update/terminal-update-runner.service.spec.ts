@@ -49,7 +49,13 @@ describe('TerminalUpdateRunnerService', () => {
     const child = new EventEmitter() as any;
     child.pid = 4321;
     child.on = child.addListener.bind(child);
+    child.unref = jest.fn();
     spawn.mockReturnValue(child);
+    jest.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: number | NodeJS.Signals) => {
+      void pid;
+      void signal;
+      return true;
+    }) as typeof process.kill);
 
     const state = await service.start({ userId: 'super-1' });
 
@@ -58,14 +64,16 @@ describe('TerminalUpdateRunnerService', () => {
       ['-n', '/usr/local/bin/pluggor-update'],
       expect.objectContaining({
         cwd: tempDir,
+        detached: true,
       }),
     );
     expect(state.status).toBe('running');
     expect(state.pid).toBe(4321);
     expect(service.getStatus().status).toBe('running');
+    expect(child.unref).toHaveBeenCalled();
   });
 
-  it('marca lost quando o backend perde o vinculo com um processo running persistido', () => {
+  it('mantem running quando o estado persistido aponta para um pid ainda vivo', () => {
     const runtimeDir = path.join(tempDir, 'terminal-update');
     fs.mkdirSync(runtimeDir, { recursive: true });
     fs.writeFileSync(
@@ -84,9 +92,45 @@ describe('TerminalUpdateRunnerService', () => {
       'utf8',
     );
 
+    jest.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: number | NodeJS.Signals) => {
+      void pid;
+      void signal;
+      return true;
+    }) as typeof process.kill);
+
+    const state = service.getStatus();
+
+    expect(state.status).toBe('running');
+  });
+
+  it('marca lost quando o backend perde o vinculo e o pid nao existe mais', () => {
+    const runtimeDir = path.join(tempDir, 'terminal-update');
+    fs.mkdirSync(runtimeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(runtimeDir, 'terminal-update-state.json'),
+      JSON.stringify({
+        status: 'running',
+        pid: 99999,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        exitCode: null,
+        command: 'sudo -n /usr/local/bin/pluggor-update',
+        logPath: null,
+        lastError: null,
+        triggeredBy: 'panel',
+      }),
+      'utf8',
+    );
+
+    jest.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: number | NodeJS.Signals) => {
+      void pid;
+      void signal;
+      throw new Error('ESRCH');
+    }) as typeof process.kill);
+
     const state = service.getStatus();
 
     expect(state.status).toBe('lost');
-    expect(state.lastError).toMatch(/perdeu o vinculo/i);
+    expect(state.lastError).toMatch(/perdeu o estado final|nao esta mais em execucao/i);
   });
 });
