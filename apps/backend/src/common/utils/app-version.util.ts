@@ -85,6 +85,7 @@ function detectDockerLikeRuntime(env: NodeJS.ProcessEnv): boolean {
 function getRootCandidates(cwd: string, env: NodeJS.ProcessEnv): string[] {
   const candidates = [
     asNonEmptyString(env.PROJECT_ROOT),
+    asNonEmptyString(env.APP_BASE_DIR),
     detectDockerLikeRuntime(env) ? '/app' : undefined,
     cwd,
     path.resolve(cwd, '..'),

@@ -641,6 +641,8 @@ native_create_app_envs() {
     upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret" "$backend_env"
     upsert_env "FRONTEND_URL" "https://${domain}" "$backend_env"
     upsert_env "UPLOADS_PUBLIC_URL" "https://${domain}/uploads" "$backend_env"
+    upsert_env "PROJECT_ROOT" "$app_dir" "$backend_env"
+    upsert_env "APP_BASE_DIR" "$app_dir" "$backend_env"
     upsert_env "UPLOADS_DIR" "${app_dir}/uploads" "$backend_env"
     upsert_env "BACKUP_DIR" "${app_dir}/backups" "$backend_env"
     upsert_env "REDIS_HOST" "127.0.0.1" "$backend_env"
@@ -655,6 +657,22 @@ native_create_app_envs() {
     upsert_env "NEXT_PUBLIC_API_URL" "https://${domain}/api" "$frontend_env"
 
     as_root "chown ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '${backend_env}' '${frontend_env}'"
+}
+
+native_ensure_backend_runtime_env() {
+    local app_dir="$1"
+    local backend_env="$app_dir/apps/backend/.env"
+
+    if [[ ! -f "$backend_env" ]]; then
+        return 0
+    fi
+
+    upsert_env "PROJECT_ROOT" "$app_dir" "$backend_env"
+    upsert_env "APP_BASE_DIR" "$app_dir" "$backend_env"
+    upsert_env "UPLOADS_DIR" "${app_dir}/uploads" "$backend_env"
+    upsert_env "BACKUP_DIR" "${app_dir}/backups" "$backend_env"
+
+    as_root "chown ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '${backend_env}'"
 }
 
 native_migrate_and_seed() {
@@ -1441,6 +1459,7 @@ run_update_native() {
         redis_pass="$(resolve_redis_password_for_install "native" "${REDIS_PASSWORD:-}" "$backend_env_file")"
         native_system_permissions_and_project "$instance_dir"
         native_write_version_metadata "$instance_dir"
+        native_ensure_backend_runtime_env "$instance_dir"
         native_install_project_dependencies "$instance_dir"
         
         native_configure_redis_auth "$redis_pass"
