@@ -14,6 +14,12 @@ describe('SystemUpdateController platform boundary', () => {
     listReleases: jest.fn(),
   };
 
+  const terminalUpdateRunnerServiceMock = {
+    start: jest.fn(),
+    getStatus: jest.fn(),
+    getLogTail: jest.fn(),
+  };
+
   const capabilitiesServiceMock = {
     getCapabilities: jest.fn(() => ({
       sourceOfTruth: 'canonical_db',
@@ -27,7 +33,11 @@ describe('SystemUpdateController platform boundary', () => {
   };
 
   const createController = () =>
-    new SystemUpdateController(serviceMock as any, capabilitiesServiceMock as any);
+    new SystemUpdateController(
+      serviceMock as any,
+      capabilitiesServiceMock as any,
+      terminalUpdateRunnerServiceMock as any,
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -44,13 +54,10 @@ describe('SystemUpdateController platform boundary', () => {
 
   it('passes audit context when running a platform update', async () => {
     const controller = createController();
-    serviceMock.runUpdate.mockResolvedValue({ started: true });
+    terminalUpdateRunnerServiceMock.start.mockResolvedValue({ started: true });
 
     await controller.run(
-      {
-        version: '2026.03.10',
-        legacyInplace: false,
-      } as any,
+      {} as any,
       {
         user: {
           id: 'super-1',
@@ -68,7 +75,7 @@ describe('SystemUpdateController platform boundary', () => {
       } as any,
     );
 
-    expect(serviceMock.runUpdate).toHaveBeenCalledWith(
+    expect(terminalUpdateRunnerServiceMock.start).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'super-1',
         userRole: Role.SUPER_ADMIN,

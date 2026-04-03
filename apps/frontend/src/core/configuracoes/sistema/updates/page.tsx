@@ -61,12 +61,6 @@ interface UpdateConfig {
   updateCheckEnabled: boolean;
 }
 
-function normalizeVersionTag(version: string): string {
-  const value = (version || '').trim();
-  if (!value) return value;
-  return value.startsWith('v') ? value : `v${value}`;
-}
-
 export default function UpdatesPage() {
   const { toast } = useToast();
 
@@ -150,15 +144,12 @@ export default function UpdatesPage() {
    * Executa atualização para versão disponível
    */
   const executeUpdate = async () => {
-    if (!status?.availableVersion) return;
+    if (loading.update) return;
 
     try {
       setLoading(prev => ({ ...prev, update: true }));
 
-      const response = await api.post('/api/update/execute', {
-        version: normalizeVersionTag(status.availableVersion),
-        packageManager: config.packageManager,
-      });
+      const response = await api.post('/api/system/update/run', {});
 
       toast({
         title: 'Atualização iniciada',
@@ -689,3 +680,4 @@ export default function UpdatesPage() {
     </div>
   );
 }
+

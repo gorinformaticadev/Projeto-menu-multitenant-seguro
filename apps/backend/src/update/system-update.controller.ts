@@ -23,6 +23,7 @@ import { SystemUpdateAdminService } from './system-update-admin.service';
 import { UpdateEngineCapabilitiesService } from './engine/update-engine-capabilities.service';
 import { extractAuditContext } from '../audit/audit-request-context.util';
 import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
+import { TerminalUpdateRunnerService } from './terminal-update-runner.service';
 
 type AuthenticatedRequest = ExpressRequest & {
   user?: {
@@ -41,6 +42,7 @@ export class SystemUpdateController {
   constructor(
     private readonly systemUpdateAdminService: SystemUpdateAdminService,
     private readonly updateEngineCapabilitiesService: UpdateEngineCapabilitiesService,
+    private readonly terminalUpdateRunnerService: TerminalUpdateRunnerService,
   ) {}
 
   private rethrowPreservingHttp(error: unknown, fallbackMessage: string): never {
@@ -53,13 +55,12 @@ export class SystemUpdateController {
   @Post('run')
   @CriticalRateLimit('update')
   async run(@Body() body: RunSystemUpdateDto, @Request() req: AuthenticatedRequest) {
+    void body;
     const { actor, requestCtx } = extractAuditContext(req);
     const userId = actor.userId || 'unknown';
 
     try {
-      return await this.systemUpdateAdminService.runUpdate({
-        version: body.version,
-        legacyInplace: body.legacyInplace,
+      return await this.terminalUpdateRunnerService.start({
         userId,
         userEmail: actor.email,
         userRole: actor.role,
@@ -74,7 +75,7 @@ export class SystemUpdateController {
   @Get('status')
   async status() {
     try {
-      return await this.systemUpdateAdminService.getStatus();
+      return this.terminalUpdateRunnerService.getStatus();
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao ler status de update');
     }
@@ -94,7 +95,7 @@ export class SystemUpdateController {
     try {
       const rawTail = query.tail as unknown as number | string | undefined;
       const parsed = Number(rawTail ?? 200);
-      return await this.systemUpdateAdminService.getLogTail(parsed);
+      return this.terminalUpdateRunnerService.getLogTail(parsed);
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao ler log de update');
     }

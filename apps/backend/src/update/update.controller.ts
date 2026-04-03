@@ -78,15 +78,9 @@ export class UpdateController {
   @HttpCode(HttpStatus.ACCEPTED)
   @CriticalRateLimit('update')
   async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req) {
-    try {
-      const userId = req.user.sub;
-      const ipAddress = req.ip;
-      const userAgent = req.headers['user-agent'];
-
-      return await this.updateService.executeUpdate(updateData, userId, ipAddress, userAgent);
-    } catch (error) {
-      this.rethrowPreservingHttp(error, 'Erro ao executar atualização');
-    }
+    void updateData;
+    void req;
+    throw new HttpException('Endpoint legado desativado. Use /api/system/update/run.', HttpStatus.GONE);
   }
 
   @Put('config')
@@ -174,3 +168,4 @@ export class UpdateController {
     };
   }
 }
+

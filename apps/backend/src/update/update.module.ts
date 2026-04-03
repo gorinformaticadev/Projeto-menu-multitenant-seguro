@@ -16,6 +16,7 @@ import { UpdateStateMachineService } from './engine/update-state-machine.service
 import { DockerUpdateRuntimeAdapter } from './engine/runtime/docker-update-runtime.adapter';
 import { NativeUpdateRuntimeAdapter } from './engine/runtime/native-update-runtime.adapter';
 import { UpdateRuntimeAdapterRegistryService } from './engine/runtime/update-runtime-adapter-registry.service';
+import { TerminalUpdateRunnerService } from './terminal-update-runner.service';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { CommonModule } from '../common/common.module';
@@ -51,6 +52,7 @@ import { CronModule } from '@core/cron/cron.module';
     UpdateRuntimeAdapterRegistryService,
     UpdateEngineCapabilitiesService,
     UpdateAgentExecutionService,
+    TerminalUpdateRunnerService,
   ],
   exports: [
     UpdateService,
@@ -64,6 +66,7 @@ import { CronModule } from '@core/cron/cron.module';
     UpdateRuntimeAdapterRegistryService,
     UpdateEngineCapabilitiesService,
     UpdateAgentExecutionService,
+    TerminalUpdateRunnerService,
   ],
 })
 export class UpdateModule {

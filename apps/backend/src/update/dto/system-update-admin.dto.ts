@@ -1,16 +1,6 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
-export class RunSystemUpdateDto {
-  @IsString()
-  @Matches(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/, {
-    message: 'Versao deve seguir semver (ex: v1.2.3)',
-  })
-  version: string;
-
-  @IsOptional()
-  @IsBoolean()
-  legacyInplace?: boolean;
-}
+export class RunSystemUpdateDto {}
 
 export class RunSystemRollbackDto {
   @IsOptional()
@@ -28,4 +18,3 @@ export class SystemUpdateLogQueryDto {
   @Max(2000)
   tail?: number;
 }
-

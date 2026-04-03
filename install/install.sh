@@ -34,6 +34,9 @@ NGINX_CERTS_DIR="$PROJECT_ROOT/nginx/certs"
 NGINX_WEBROOT="$PROJECT_ROOT/nginx/webroot"
 NATIVE_SYSTEM_USER="multitenant"
 NATIVE_BASE_DIR="/home/${NATIVE_SYSTEM_USER}"
+PANEL_UPDATE_WRAPPER_DEST="/usr/local/bin/pluggor-update"
+PANEL_UPDATE_SUDOERS_FILE="/etc/sudoers.d/pluggor-update"
+PANEL_UPDATE_LOCK_FILE="/tmp/pluggor-update.lock"
 
 # --- Cores e helpers ---
 echored()   { echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"; }
@@ -48,6 +51,129 @@ cleanup_on_error() {
     exit 1
 }
 trap cleanup_on_error ERR
+
+install_package_if_missing() {
+    local cmd="$1"
+    local package_name="$2"
+    if command -v "$cmd" &>/dev/null; then
+        return 0
+    fi
+
+    apt-get update -qq
+    apt-get install -y -qq "$package_name"
+}
+
+ensure_panel_update_dependencies() {
+    install_package_if_missing "flock" "util-linux"
+    install_package_if_missing "visudo" "sudo"
+}
+
+collect_pm2_runtime_users() {
+    if ! command -v ps &>/dev/null; then
+        return 0
+    fi
+
+    ps -eo user=,args= 2>/dev/null | awk '
+        BEGIN { IGNORECASE = 1 }
+        /pm2/ && /god daemon/ { print $1 }
+    ' | sort -u
+}
+
+resolve_panel_update_app_user() {
+    local explicit_user="${APP_USER:-}"
+    local pm2_users=()
+    local pm2_user=""
+
+    while IFS= read -r pm2_user; do
+        [[ -n "$pm2_user" ]] && pm2_users+=("$pm2_user")
+    done < <(collect_pm2_runtime_users)
+
+    if [[ -n "$explicit_user" ]]; then
+        if [[ "$explicit_user" == "root" ]]; then
+            log_error "APP_USER nao pode ser root."
+            exit 1
+        fi
+        if ! id "$explicit_user" &>/dev/null; then
+            log_error "APP_USER nao encontrado: $explicit_user"
+            exit 1
+        fi
+        echo "$explicit_user"
+        return 0
+    fi
+
+    if [[ "${#pm2_users[@]}" -gt 1 ]]; then
+        log_error "Multiplos usuarios de PM2 detectados (${pm2_users[*]}). Defina APP_USER explicitamente."
+        exit 1
+    fi
+
+    if [[ "${#pm2_users[@]}" -eq 1 ]]; then
+        if [[ "${pm2_users[0]}" == "root" ]]; then
+            log_error "O usuario detectado do PM2 nao pode ser root."
+            exit 1
+        fi
+        echo "${pm2_users[0]}"
+        return 0
+    fi
+
+    echo "$NATIVE_SYSTEM_USER"
+}
+
+install_panel_update_wrapper() {
+    local project_dir="$1"
+    local app_user="$2"
+    local wrapper_source="$PROJECT_ROOT/install/pluggor-update.wrapper.sh"
+    local wrapper_tmp=""
+
+    if [[ ! -f "$wrapper_source" ]]; then
+        log_error "Wrapper de update nao encontrado em $wrapper_source"
+        exit 1
+    fi
+
+    bash -n "$wrapper_source"
+    wrapper_tmp="$(mktemp)"
+    sed \
+        -e "s|__PROJECT_DIR__|$project_dir|g" \
+        -e "s|__APP_USER__|$app_user|g" \
+        "$wrapper_source" > "$wrapper_tmp"
+    bash -n "$wrapper_tmp"
+    install -o root -g root -m 0755 "$wrapper_tmp" "$PANEL_UPDATE_WRAPPER_DEST"
+    rm -f "$wrapper_tmp"
+}
+
+configure_panel_update_sudoers() {
+    local app_user="$1"
+    local tmp_sudoers=""
+
+    tmp_sudoers="$(mktemp)"
+    printf '%s ALL=(root) NOPASSWD: %s\n' "$app_user" "$PANEL_UPDATE_WRAPPER_DEST" > "$tmp_sudoers"
+    chmod 440 "$tmp_sudoers"
+    visudo -cf "$tmp_sudoers" >/dev/null
+    install -o root -g root -m 0440 "$tmp_sudoers" "$PANEL_UPDATE_SUDOERS_FILE"
+    rm -f "$tmp_sudoers"
+    visudo -cf "$PANEL_UPDATE_SUDOERS_FILE" >/dev/null
+}
+
+setup_panel_update_runtime() {
+    local project_dir="$1"
+    local app_user="$2"
+
+    if [[ ! -d "$project_dir" ]]; then
+        log_error "Diretorio do projeto nao encontrado para configurar update via painel: $project_dir"
+        exit 1
+    fi
+
+    ensure_panel_update_dependencies
+    install_panel_update_wrapper "$project_dir" "$app_user"
+    configure_panel_update_sudoers "$app_user"
+}
+
+acquire_global_update_lock() {
+    exec 200>"$PANEL_UPDATE_LOCK_FILE"
+    if ! flock -n 200; then
+        echo "Ja existe uma atualizacao em execucao"
+        exit 1
+    fi
+}
 
 # --- Uso ---
 show_usage() {
@@ -606,6 +732,7 @@ run_install_native() {
         log_warn "SSL nao foi emitido/configurado nesta execucao. Instalacao native continuara sem abortar."
     fi
     native_start_firewall
+    setup_panel_update_runtime "$app_dir" "$(resolve_panel_update_app_user)"
     native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$trusted_device_secret" "$redis_pass" "$app_dir"
 }
 
@@ -1733,6 +1860,8 @@ run_update() {
         esac
     done
 
+    acquire_global_update_lock
+
     cd "$PROJECT_ROOT"
 
     ensure_env_file
@@ -1914,6 +2043,10 @@ run_update() {
         else
             log_warn "Update Native solicitado, mas nenhuma instalacao Native foi detectada."
         fi
+    fi
+
+    if [[ "$native_detected" == "true" ]]; then
+        setup_panel_update_runtime "$PROJECT_ROOT" "$(resolve_panel_update_app_user)"
     fi
 
     echogreen "Atualização concluída."
