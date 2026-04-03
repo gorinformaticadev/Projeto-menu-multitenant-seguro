@@ -7,6 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   CheckCircle,
   Database,
   Download,
@@ -117,13 +125,18 @@ export default function UpdatesPage() {
     logs: false,
   });
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+  const [showRuntimeModal, setShowRuntimeModal] = useState(false);
   const [activeTab, setActiveTab] = useState('status');
   const [hasSavedGitToken, setHasSavedGitToken] = useState(false);
+  const [lastKnownVersion, setLastKnownVersion] = useState('unknown');
   const lastRuntimeStatusRef = useRef<TerminalUpdateRuntimeStatus['status'] | null>(null);
+  const wasUpdateRunningRef = useRef(false);
 
   const effectiveMode = status?.effectiveMode || status?.mode || 'native';
   const isUpdateRunning = runtimeStatus?.status === 'running' || loading.update;
-  const displayedVersion = version !== 'unknown' ? version : status?.currentVersion || 'unknown';
+  const displayedVersion =
+    version !== 'unknown' ? version : status?.currentVersion || lastKnownVersion || 'unknown';
+  const shouldShowVersionLoading = versionLoading && displayedVersion === 'unknown';
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || '').trim().toLowerCase();
@@ -131,6 +144,15 @@ export default function UpdatesPage() {
       setActiveTab(requestedTab);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const candidateVersion =
+      version !== 'unknown' ? version : status?.currentVersion && status.currentVersion !== 'unknown' ? status.currentVersion : null;
+
+    if (candidateVersion) {
+      setLastKnownVersion(candidateVersion);
+    }
+  }, [status?.currentVersion, version]);
 
   const loadStatus = useCallback(async (options?: { silent?: boolean }) => {
     try {
@@ -243,6 +265,14 @@ export default function UpdatesPage() {
   }, [isMaintenanceActive, isUpdateRunning, loadLogs, loadRuntimeLog, loadRuntimeStatus, loadStatus, refreshVersion]);
 
   useEffect(() => {
+    if (isUpdateRunning && !wasUpdateRunningRef.current) {
+      setShowRuntimeModal(true);
+    }
+
+    wasUpdateRunningRef.current = isUpdateRunning;
+  }, [isUpdateRunning]);
+
+  useEffect(() => {
     const currentStatus = runtimeStatus?.status || 'idle';
     if (currentStatus === 'success' || currentStatus === 'failed' || currentStatus === 'lost') {
       if (lastRuntimeStatusRef.current !== currentStatus) {
@@ -304,6 +334,7 @@ export default function UpdatesPage() {
         description: response.data?.message || 'O processo de atualizacao foi iniciado.',
       });
       setShowUpdateConfirm(false);
+      setShowRuntimeModal(true);
       await Promise.all([loadStatus(), loadLogs(), loadRuntimeStatus(), loadRuntimeLog()]);
     } catch (error: unknown) {
       toast({
@@ -397,7 +428,7 @@ export default function UpdatesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versão Atual</Label>
-                      <div className="text-2xl font-bold text-skin-info">{versionLoading ? 'carregando...' : displayedVersion}</div>
+                      <div className="text-2xl font-bold text-skin-info">{shouldShowVersionLoading ? 'carregando...' : displayedVersion}</div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versão Disponivel</Label>
@@ -493,6 +524,12 @@ export default function UpdatesPage() {
                   <pre className="min-h-[220px] max-h-[420px] overflow-auto rounded-lg border border-skin-border bg-skin-background-subtle p-3 text-xs text-skin-text whitespace-pre-wrap break-words">
                     {runtimeLog || 'Nenhuma execucao de update registrada.'}
                   </pre>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => setShowRuntimeModal(true)}>
+                    Acompanhar em Modal
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -609,6 +646,61 @@ export default function UpdatesPage() {
           </Card>
         </div>
       )}
+
+      <Dialog open={showRuntimeModal} onOpenChange={setShowRuntimeModal}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Acompanhamento do Update
+              {runtimeStatus?.status === 'running' && <RefreshCw className="h-4 w-4 animate-spin text-skin-primary" />}
+            </DialogTitle>
+            <DialogDescription>
+              Este modal mostra o mesmo log bruto da execucao, atualizado conforme o painel recebe novas linhas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Status</Label>
+              <div className="font-medium">{runtimeStatus?.status || 'idle'}</div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">PID</Label>
+              <div className="font-medium">{runtimeStatus?.pid ?? 'N/A'}</div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Versao exibida</Label>
+              <div className="font-medium">{displayedVersion}</div>
+            </div>
+            <div className="space-y-1 md:col-span-3">
+              <Label className="text-xs font-medium">Comando</Label>
+              <div className="text-skin-text-muted break-all">{runtimeStatus?.command || 'sudo -n /usr/local/bin/pluggor-update'}</div>
+            </div>
+          </div>
+
+          {runtimeStatus?.lastError && (
+            <div className="flex items-start gap-2 rounded-lg border border-skin-danger/30 bg-skin-danger/10 p-3 text-sm text-skin-danger">
+              <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <div>
+                <strong>Erro:</strong> {runtimeStatus.lastError}
+              </div>
+            </div>
+          )}
+
+          <pre className="min-h-[320px] max-h-[60vh] overflow-auto rounded-lg border border-skin-border bg-skin-background-subtle p-4 text-xs text-skin-text whitespace-pre-wrap break-words">
+            {runtimeLog || 'Nenhuma execucao de update registrada.'}
+          </pre>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { void loadRuntimeStatus({ silent: true }); void loadRuntimeLog({ silent: true }); }}>
+              Atualizar Agora
+            </Button>
+            <Button variant="outline" onClick={() => setShowRuntimeModal(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

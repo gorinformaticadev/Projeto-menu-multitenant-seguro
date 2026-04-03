@@ -96,7 +96,7 @@ export function useSystemVersion() {
       const response = await api.get('/api/system/version');
       setVersionInfo(normalizeVersionResponse(response.data));
     } catch {
-      setVersionInfo(FALLBACK_VERSION);
+      setVersionInfo((previous) => (previous.version !== 'unknown' ? previous : FALLBACK_VERSION));
     } finally {
       setLoading(false);
     }
