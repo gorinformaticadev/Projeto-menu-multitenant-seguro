@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 PROJECT_DIR="__PROJECT_DIR__"
 
-if [[ "$PROJECT_DIR" == "__PROJECT_DIR__" ]] || [[ -z "$PROJECT_DIR" ]]; then
+if [[ -z "$PROJECT_DIR" ]]; then
   echo "[pluggor-update] ERRO: PROJECT_DIR nao foi configurado no wrapper." >&2
   exit 10
 fi

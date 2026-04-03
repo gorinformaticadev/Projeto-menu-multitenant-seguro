@@ -126,6 +126,10 @@ install_panel_update_wrapper() {
         log_error "Wrapper de update instalado com owner/permissao invalidos: $PANEL_UPDATE_WRAPPER_DEST"
         exit 1
     fi
+    if grep -q '__PROJECT_DIR__' "$PANEL_UPDATE_WRAPPER_DEST" 2>/dev/null; then
+        log_error "Wrapper de update instalado com placeholder pendente: $PANEL_UPDATE_WRAPPER_DEST"
+        exit 1
+    fi
 }
 
 configure_panel_update_sudoers() {
