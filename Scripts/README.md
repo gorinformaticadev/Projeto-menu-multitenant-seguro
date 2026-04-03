@@ -11,3 +11,17 @@ Organizacao da pasta `Scripts/`:
 Importante:
 - Scripts oficiais de instalacao, update e desinstalacao ficam em `install/`.
 - Use `install/install.sh`, `install/update.sh` e `install/uninstall.sh` como fluxo padrao.
+
+Contrato operacional da app:
+
+- `Scripts/deploy.sh` concentra o deploy da plataforma
+- o instalador/orquestrador deve chamar apenas:
+  - `preflight`
+  - `full`
+  - `start-validation`
+  - `health`
+  - `stop-validation`
+  - `activate`
+  - `published-health`
+  - `version`
+- o script deve rodar sempre em uma release temporaria, nunca diretamente no source repo e nunca no runtime publicado antes do `promote`
