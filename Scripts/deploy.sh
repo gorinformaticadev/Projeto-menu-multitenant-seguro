@@ -46,6 +46,77 @@ read_env_value() {
   printf '%s\n' "$value"
 }
 
+json_escape() {
+  local value="${1:-}"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+resolve_source_repo_dir() {
+  if [[ -n "${APP_SOURCE_DIR:-}" ]] && git -C "$APP_SOURCE_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    printf '%s\n' "$APP_SOURCE_DIR"
+    return 0
+  fi
+
+  if git -C "$RELEASE_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    printf '%s\n' "$RELEASE_ROOT"
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_release_version_value() {
+  local source_repo_dir="$1"
+  local exact_tag=""
+  local short_sha=""
+
+  exact_tag="$(git -C "$source_repo_dir" describe --tags --exact-match 2>/dev/null || true)"
+  if [[ -n "$exact_tag" ]]; then
+    printf '%s\n' "$exact_tag"
+    return 0
+  fi
+
+  short_sha="$(git -C "$source_repo_dir" rev-parse --short HEAD 2>/dev/null || true)"
+  if [[ -n "$short_sha" ]]; then
+    printf 'dev+%s\n' "$short_sha"
+    return 0
+  fi
+
+  return 1
+}
+
+write_release_metadata() {
+  local source_repo_dir=""
+  local version_value=""
+  local commit_sha=""
+  local branch_name=""
+  local build_date=""
+  local version_json=""
+  local sha_json=""
+  local branch_json=""
+
+  source_repo_dir="$(resolve_source_repo_dir)" || fail "Nao foi possivel localizar um repositorio Git valido para gerar a metadata da release"
+  version_value="$(resolve_release_version_value "$source_repo_dir")" || fail "Nao foi possivel resolver a versao da release a partir de $source_repo_dir"
+  commit_sha="$(git -C "$source_repo_dir" rev-parse HEAD 2>/dev/null || true)"
+  branch_name="$(git -C "$source_repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  build_date="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+  version_json="$(json_escape "$version_value")"
+  sha_json="$(json_escape "${commit_sha:-unknown}")"
+  branch_json="$(json_escape "${branch_name:-unknown}")"
+
+  printf '%s\n' "$version_value" > "$RELEASE_ROOT/VERSION"
+  printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s",\n  "branch": "%s"\n}\n' \
+    "$version_json" "$sha_json" "$build_date" "$branch_json" > "$RELEASE_ROOT/BUILD_INFO.json"
+
+  log "Metadata da release atualizada: version=$version_value commit=${commit_sha:-unknown}"
+}
+
 resolve_backend_port() {
   read_env_value "$RELEASE_ROOT/apps/backend/.env" "PORT" "${PUBLISHED_BACKEND_PORT:-4000}"
 }
@@ -243,6 +314,8 @@ cmd_full() {
   run_pnpm corepack pnpm --filter backend prisma:migrate
   log "Executando seed versionado"
   run_pnpm corepack pnpm --filter backend seed:deploy
+  log "Atualizando metadata da release"
+  write_release_metadata
 }
 
 cmd_start_validation() {
