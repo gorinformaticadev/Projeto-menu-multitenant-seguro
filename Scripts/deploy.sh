@@ -253,15 +253,32 @@ wait_for_http() {
   local sleep_seconds="${4:-2}"
   local attempt=1
 
+  log "Aguardando $label em $url"
   while [[ "$attempt" -le "$attempts" ]]; do
     if curl --silent --show-error --fail "$url" >/dev/null 2>&1; then
       return 0
+    fi
+
+    if (( attempt == 1 || attempt % 5 == 0 )); then
+      log "Ainda aguardando $label (tentativa ${attempt}/${attempts})"
     fi
     sleep "$sleep_seconds"
     attempt=$((attempt + 1))
   done
 
-  fail "Healthcheck falhou para $label em $url"
+  return 1
+}
+
+dump_log_tail() {
+  local file_path="$1"
+  local label="$2"
+
+  if [[ -f "$file_path" ]]; then
+    log "Ultimas linhas de $label:"
+    tail -n 40 "$file_path" | while IFS= read -r line || [[ -n "$line" ]]; do
+      printf '[deploy][tail:%s] %s\n' "$label" "$line"
+    done
+  fi
 }
 
 kill_pid_file() {
@@ -356,15 +373,31 @@ cmd_health_validation() {
   local home_html_file="$frontend_probe_dir/home.html"
   local static_asset_path=""
 
-  wait_for_http "http://${host}:${backend_port}/api/health" "backend de validacao"
-  wait_for_http "http://${host}:${frontend_port}" "frontend de validacao"
+  if ! wait_for_http "http://${host}:${backend_port}/api/health" "backend de validacao"; then
+    dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
+    dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
+    fail "Healthcheck falhou para backend de validacao em http://${host}:${backend_port}/api/health"
+  fi
+
+  if ! wait_for_http "http://${host}:${frontend_port}" "frontend de validacao"; then
+    dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
+    dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
+    fail "Healthcheck falhou para frontend de validacao em http://${host}:${frontend_port}"
+  fi
+
   mkdir -p "$frontend_probe_dir"
   curl --silent --show-error --fail "http://${host}:${frontend_port}" -o "$home_html_file"
   static_asset_path="$(extract_first_static_asset_path "$home_html_file")"
   if [[ -z "$static_asset_path" ]]; then
+    dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
+    dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
     fail "Nao foi possivel localizar nenhum asset em /_next/static na release de validacao"
   fi
-  wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend de validacao"
+  if ! wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend de validacao"; then
+    dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
+    dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
+    fail "Healthcheck falhou para asset estatico do frontend de validacao em http://${host}:${frontend_port}${static_asset_path}"
+  fi
   log "Healthcheck da validacao temporaria OK"
 }
 
@@ -414,15 +447,15 @@ cmd_health_published() {
   backend_port="$(resolve_backend_port)"
   frontend_port="$(resolve_frontend_port)"
 
-  wait_for_http "http://${host}:${backend_port}/api/health" "backend publicado"
-  wait_for_http "http://${host}:${frontend_port}" "frontend publicado"
+  wait_for_http "http://${host}:${backend_port}/api/health" "backend publicado" || fail "Healthcheck falhou para backend publicado em http://${host}:${backend_port}/api/health"
+  wait_for_http "http://${host}:${frontend_port}" "frontend publicado" || fail "Healthcheck falhou para frontend publicado em http://${host}:${frontend_port}"
   mkdir -p "$published_probe_dir"
   curl --silent --show-error --fail "http://${host}:${frontend_port}" -o "$home_html_file"
   static_asset_path="$(extract_first_static_asset_path "$home_html_file")"
   if [[ -z "$static_asset_path" ]]; then
     fail "Nao foi possivel localizar nenhum asset em /_next/static na release publicada"
   fi
-  wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend publicado"
+  wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend publicado" || fail "Healthcheck falhou para asset estatico do frontend publicado em http://${host}:${frontend_port}${static_asset_path}"
   log "Healthcheck da release publicada OK"
 }
 
