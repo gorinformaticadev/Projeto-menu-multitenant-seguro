@@ -251,10 +251,16 @@ wait_for_http() {
   local label="$2"
   local attempts="${3:-30}"
   local sleep_seconds="${4:-2}"
+  local pid_file="${5:-}"
   local attempt=1
 
   log "Aguardando $label em $url"
   while [[ "$attempt" -le "$attempts" ]]; do
+    if [[ -n "$pid_file" ]] && ! is_pid_file_running "$pid_file"; then
+      log "Processo associado a $label encerrou antes do healthcheck responder"
+      return 1
+    fi
+
     if curl --silent --show-error --fail --connect-timeout 2 --max-time 5 "$url" >/dev/null 2>&1; then
       return 0
     fi
@@ -383,19 +389,13 @@ cmd_health_validation() {
   local home_html_file="$frontend_probe_dir/home.html"
   local static_asset_path=""
 
-  if ! wait_for_http "http://${host}:${backend_port}/api/health" "backend de validacao" 30 2; then
-    if ! is_pid_file_running "$BACKEND_PID_FILE"; then
-      log "Processo do backend de validacao encerrou antes de responder ao healthcheck"
-    fi
+  if ! wait_for_http "http://${host}:${backend_port}/api/health" "backend de validacao" 30 2 "$BACKEND_PID_FILE"; then
     dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
     dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
     fail "Healthcheck falhou para backend de validacao em http://${host}:${backend_port}/api/health"
   fi
 
-  if ! wait_for_http "http://${host}:${frontend_port}" "frontend de validacao" 30 2; then
-    if ! is_pid_file_running "$FRONTEND_PID_FILE"; then
-      log "Processo do frontend de validacao encerrou antes de responder ao healthcheck"
-    fi
+  if ! wait_for_http "http://${host}:${frontend_port}" "frontend de validacao" 30 2 "$FRONTEND_PID_FILE"; then
     dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
     dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
     fail "Healthcheck falhou para frontend de validacao em http://${host}:${frontend_port}"
@@ -409,7 +409,7 @@ cmd_health_validation() {
     dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
     fail "Nao foi possivel localizar nenhum asset em /_next/static na release de validacao"
   fi
-  if ! wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend de validacao"; then
+  if ! wait_for_http "http://${host}:${frontend_port}${static_asset_path}" "asset estatico do frontend de validacao" 30 2 "$FRONTEND_PID_FILE"; then
     dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
     dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
     fail "Healthcheck falhou para asset estatico do frontend de validacao em http://${host}:${frontend_port}${static_asset_path}"
