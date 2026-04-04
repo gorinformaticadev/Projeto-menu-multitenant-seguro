@@ -255,7 +255,7 @@ wait_for_http() {
 
   log "Aguardando $label em $url"
   while [[ "$attempt" -le "$attempts" ]]; do
-    if curl --silent --show-error --fail "$url" >/dev/null 2>&1; then
+    if curl --silent --show-error --fail --connect-timeout 2 --max-time 5 "$url" >/dev/null 2>&1; then
       return 0
     fi
 
@@ -267,6 +267,16 @@ wait_for_http() {
   done
 
   return 1
+}
+
+is_pid_file_running() {
+  local pid_file="$1"
+  local pid=""
+
+  [[ -f "$pid_file" ]] || return 0
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  [[ -n "$pid" ]] || return 1
+  kill -0 "$pid" >/dev/null 2>&1
 }
 
 dump_log_tail() {
@@ -373,13 +383,19 @@ cmd_health_validation() {
   local home_html_file="$frontend_probe_dir/home.html"
   local static_asset_path=""
 
-  if ! wait_for_http "http://${host}:${backend_port}/api/health" "backend de validacao"; then
+  if ! wait_for_http "http://${host}:${backend_port}/api/health" "backend de validacao" 30 2; then
+    if ! is_pid_file_running "$BACKEND_PID_FILE"; then
+      log "Processo do backend de validacao encerrou antes de responder ao healthcheck"
+    fi
     dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
     dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
     fail "Healthcheck falhou para backend de validacao em http://${host}:${backend_port}/api/health"
   fi
 
-  if ! wait_for_http "http://${host}:${frontend_port}" "frontend de validacao"; then
+  if ! wait_for_http "http://${host}:${frontend_port}" "frontend de validacao" 30 2; then
+    if ! is_pid_file_running "$FRONTEND_PID_FILE"; then
+      log "Processo do frontend de validacao encerrou antes de responder ao healthcheck"
+    fi
     dump_log_tail "$BACKEND_LOG_FILE" "validation-backend"
     dump_log_tail "$FRONTEND_LOG_FILE" "validation-frontend"
     fail "Healthcheck falhou para frontend de validacao em http://${host}:${frontend_port}"
