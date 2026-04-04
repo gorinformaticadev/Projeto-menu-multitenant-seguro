@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.5](https://github.com/gorinformaticadev/Pluggor/compare/v0.3.4...v0.3.5) (2026-04-04)
+
+
+### Features
+
+* **app:** add release deploy contract ([04da038](https://github.com/gorinformaticadev/Pluggor/commit/04da0384076427c7d5dcf7fea19e096d9900a213))
+* **update:** isntalador sempre se atualiza antes do pudate. ([5e7dbec](https://github.com/gorinformaticadev/Pluggor/commit/5e7dbec387bb6d16d7f0ab6bf6a95a05ee07645d))
+
+
+### Bug Fixes
+
+* **deploy:** package standalone frontend assets ([c3e1441](https://github.com/gorinformaticadev/Pluggor/commit/c3e1441cb34eca0923619144bbc52ab4ec528833))
+* **deploy:** place next static assets in runtime dir ([529f440](https://github.com/gorinformaticadev/Pluggor/commit/529f4405390b33327e39557dba92ce1a216bfae9))
+* **deploy:** use clean frontend build for releases ([c4ad2c0](https://github.com/gorinformaticadev/Pluggor/commit/c4ad2c03c7ab6e9b70ad441798d1f741ec41261d))
+* **deploy:** write release metadata from source repo ([54dd721](https://github.com/gorinformaticadev/Pluggor/commit/54dd7211808cdbc4582af2f629c4d9deec9b54c2))
+* **update:** fall back to legacy wrapper during rollout ([0568bf2](https://github.com/gorinformaticadev/Pluggor/commit/0568bf29a74b4440c2373401afebcdf23187e4ec))
+
 ### [0.3.4](https://github.com/gorinformaticadev/Pluggor/compare/v0.3.3...v0.3.4) (2026-04-01)
 
 ### [0.3.3](https://github.com/gorinformaticadev/Pluggor/compare/v0.3.2...v0.3.3) (2026-04-01)
