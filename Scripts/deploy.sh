@@ -427,6 +427,8 @@ cmd_activate() {
   local frontend_name=""
   local backend_port=""
   local frontend_port=""
+  local backend_entry=""
+  local frontend_entry=""
 
   require_command pm2
   : "${APP_INSTANCE_NAME:?APP_INSTANCE_NAME precisa estar definido para activate}"
@@ -435,21 +437,29 @@ cmd_activate() {
   frontend_name="${APP_INSTANCE_NAME}-frontend"
   backend_port="$(resolve_backend_port)"
   frontend_port="$(resolve_frontend_port)"
+  backend_entry="$RELEASE_ROOT/apps/backend/dist/main.js"
+  frontend_entry="$RELEASE_ROOT/apps/frontend/scripts/start-standalone.mjs"
+
+  [[ -f "$backend_entry" ]] || fail "Entry point do backend nao encontrado em $backend_entry"
+  [[ -f "$frontend_entry" ]] || fail "Entry point do frontend nao encontrado em $frontend_entry"
 
   log "Ativando release publicada para a instancia $APP_INSTANCE_NAME"
+  log "Recriando processo PM2 do backend: $backend_name"
   pm2 delete "$backend_name" >/dev/null 2>&1 || true
+  log "Recriando processo PM2 do frontend: $frontend_name"
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
   PROJECT_ROOT="$RELEASE_ROOT" \
   APP_BASE_DIR="$RELEASE_ROOT" \
   PORT="$backend_port" \
-  pm2 start dist/main.js --name "$backend_name" --cwd "$RELEASE_ROOT/apps/backend" --update-env
+  pm2 start "$backend_entry" --name "$backend_name" --cwd "$RELEASE_ROOT/apps/backend" --update-env
 
   PORT="$frontend_port" \
   HOSTNAME="0.0.0.0" \
-  pm2 start "node scripts/start-standalone.mjs" --name "$frontend_name" --cwd "$RELEASE_ROOT/apps/frontend" --update-env
+  pm2 start "$frontend_entry" --interpreter node --name "$frontend_name" --cwd "$RELEASE_ROOT/apps/frontend" --update-env
 
-  pm2 save >/dev/null
+  pm2 save --force
+  pm2 ls
 }
 
 cmd_health_published() {
